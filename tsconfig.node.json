@@ -4,7 +4,9 @@
     "electron.vite.config.*",
     "src/main/**/*",
     "src/preload/**/*",
-    "src/shared/**/*"
+    "src/shared/**/*",
+    "phone/main/**/*",
+    "phone/types/**/*"
   ],
   "compilerOptions": {
     "composite": true,

@@ -1,10 +1,10 @@
 {
-  "name": "hermes-desktop",
+  "name": "hermes-plus",
   "version": "0.7.7",
-  "description": "Hermes Agent Desktop — self-improving AI assistant",
+  "description": "Hermes Plus — Open-source Desktop Connector for Langhua AI Phone",
   "main": "./out/main/index.js",
-  "author": "fathah",
-  "homepage": "https://github.com/fathah/hermes-desktop",
+  "author": "Langhua AI & fathah",
+  "homepage": "https://github.com/terrancehxx/hermes-plus",
   "scripts": {
     "format": "prettier --write .",
     "lint": "eslint --cache --max-warnings=0 .",
@@ -40,7 +40,7 @@
     "@types/highlight.js": "^9.12.4",
     "@types/react-syntax-highlighter": "^15.5.13",
     "better-sqlite3": "^13.0.3",
-    "border-beam": "^1.3.0",
+    "border-beam": "^1.4.1",
     "date-fns": "^4.4.0",
     "electron-updater": "^6.8.9",
     "ethers": "^6.17.0",

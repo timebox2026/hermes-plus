@@ -1,4 +1,12 @@
-<img width="100%" alt="HERMES DESKTOP" src="assets/header.webp" />
+<img width="100%" alt="HERMES PLUS" src="assets/header.webp" />
+
+# Hermes Plus — AI 手机开源桌面连接器
+
+> 🚀 **面向第三方开发者的浪花 AI 手机桌面端开源脚手架**。  
+> 本项目基于上游官方开源项目 [`fathah/hermes-desktop`](https://github.com/fathah/hermes-desktop) 构建，通过自包含的 `phone/` 模块，为开发者提供低延迟 WebRTC 实时屏幕投屏、物理触控映射（Click-to-Tap）、应用提权与 SSE 实时事件监听。
+>
+> - 🔄 **上游同步指引**：详见 [UPSTREAM_SYNC.md](./UPSTREAM_SYNC.md)  
+> - 📖 **开发者协议规范**：查阅 [浪花 AI 开发者平台文档](https://github.com/terrancehxx/hermes-plus)
 
 <br/>
 <p align="center">

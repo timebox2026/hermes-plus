@@ -52,6 +52,11 @@ import {
 import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
+// [Phone Extension Mount Start]
+import { PhoneWorkspace } from "../../../../../phone/views/PhoneWorkspace";
+import { Smartphone } from "lucide-react";
+// [Phone Extension Mount End]
+
 type View =
   | "chat"
   | "discover"
@@ -63,7 +68,10 @@ type View =
   | "tools"
   | "schedules"
   | "kanban"
-  | "gateway";
+  | "gateway"
+  // [Phone Extension Mount Start]
+  | "phone";
+  // [Phone Extension Mount End]
 
 const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "discover", icon: Compass, labelKey: "navigation.discover" },
@@ -74,6 +82,9 @@ const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
+  // [Phone Extension Mount Start]
+  { view: "phone", icon: Smartphone, labelKey: "AI 手机" },
+  // [Phone Extension Mount End]
 ];
 
 const FOOTER_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
@@ -1033,6 +1044,14 @@ function Layout({
               )}
             </div>
           )}
+
+          {/* [Phone Extension Mount Start] */}
+          {visitedViews.has("phone") && (
+            <div style={paneStyle("phone")}>
+              <PhoneWorkspace />
+            </div>
+          )}
+          {/* [Phone Extension Mount End] */}
         </main>
       </div>
       <StatusBar activeProfile={activeProfile} />
