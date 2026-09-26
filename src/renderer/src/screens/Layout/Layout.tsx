@@ -53,8 +53,12 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
 // [Phone Extension Mount Start]
-import { PhoneLayout } from "../../../../../phone/views/PhoneLayout";
 import { SuiteSwitcher } from "../../../../../phone/components/SuiteSwitcher";
+import {
+  PhoneSidebarNav,
+  type PhoneNavId,
+} from "../../../../../phone/components/PhoneSidebarNav";
+import { PhoneEmptyView } from "../../../../../phone/views/PhoneEmptyView";
 // [Phone Extension Mount End]
 
 type View =
@@ -273,6 +277,8 @@ function Layout({
       return "hermes";
     }
   });
+
+  const [activePhoneNav, setActivePhoneNav] = useState<PhoneNavId>("my-phones");
 
   const handleSuiteChange = useCallback((suite: "hermes" | "phone") => {
     setActiveSuite(suite);
@@ -707,18 +713,6 @@ function Layout({
     ? t("navigation.expandSidebar")
     : t("navigation.collapseSidebar");
 
-  // [Phone Extension Mount Start]
-  if (activeSuite === "phone") {
-    return (
-      <PhoneLayout
-        onSuiteChange={handleSuiteChange}
-        sidebarCollapsed={sidebarCollapsed}
-        toggleSidebar={toggleSidebar}
-      />
-    );
-  }
-  // [Phone Extension Mount End]
-
   return (
     <div className="layout-shell">
       <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
@@ -757,73 +751,85 @@ function Layout({
           />
           {/* [Phone Extension Mount End] */}
 
-          <nav className="sidebar-nav sidebar-nav-pinned">
-            <button
-              className={`sidebar-nav-item sidebar-new-chat ${
-                view === "chat" && currentSessionId === null ? "active" : ""
-              }`}
-              onClick={handleNewChat}
-              title={t("navigation.newChat")}
-              aria-label={t("navigation.newChat")}
-            >
-              <Plus size={16} />
-              <span className="sidebar-nav-label">
-                {t("navigation.newChat")}
-              </span>
-            </button>
-            {PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => {
-              return (
+          {activeSuite === "hermes" ? (
+            <>
+              <nav className="sidebar-nav sidebar-nav-pinned">
                 <button
-                  key={v}
-                  className={`sidebar-nav-item ${view === v ? "active" : ""}`}
-                  onClick={() => goTo(v)}
-                  title={t(labelKey)}
-                  aria-label={t(labelKey)}
-                >
-                  <Icon size={16} />
-                  <span className="sidebar-nav-label">{t(labelKey)}</span>
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="sidebar-chat-section">
-            <div className="sidebar-nav-sessions">
-              <div className="sidebar-chat-scroll" ref={sidebarChatScrollRef}>
-                <SidebarRecentSessions
-                  open={!sidebarCollapsed}
-                  connectionId={connectionId}
-                  activeProfile={activeProfile}
-                  currentSessionId={currentSessionId}
-                  loadingSessionIds={loadingSessionIds}
-                  resumingSessionId={resumingSessionId}
-                  onSelect={handleResumeSession}
-                  onSessionDeleted={(id) => {
-                    // If the open chat was the one deleted, drop to a fresh chat
-                    // so the user isn't left viewing a now-gone conversation.
-                    if (id === currentSessionId) handleNewChat();
-                  }}
-                  scrollRootRef={sidebarChatScrollRef}
-                />
-              </div>
-              {sidebarScrollbar.scrollable && (
-                <div
-                  className={`sidebar-chat-scrollbar ${
-                    sidebarScrollbar.visible ? "visible" : ""
+                  className={`sidebar-nav-item sidebar-new-chat ${
+                    view === "chat" && currentSessionId === null ? "active" : ""
                   }`}
-                  aria-hidden="true"
+                  onClick={handleNewChat}
+                  title={t("navigation.newChat")}
+                  aria-label={t("navigation.newChat")}
                 >
-                  <div
-                    className="sidebar-chat-scrollbar-thumb"
-                    style={{
-                      height: sidebarScrollbar.height,
-                      transform: `translateY(${sidebarScrollbar.top}px)`,
-                    }}
-                  />
+                  <Plus size={16} />
+                  <span className="sidebar-nav-label">
+                    {t("navigation.newChat")}
+                  </span>
+                </button>
+                {PINNED_NAV_ITEMS.map(({ view: v, icon: Icon, labelKey }) => {
+                  return (
+                    <button
+                      key={v}
+                      className={`sidebar-nav-item ${view === v ? "active" : ""}`}
+                      onClick={() => goTo(v)}
+                      title={t(labelKey)}
+                      aria-label={t(labelKey)}
+                    >
+                      <Icon size={16} />
+                      <span className="sidebar-nav-label">{t(labelKey)}</span>
+                    </button>
+                  );
+                })}
+              </nav>
+
+              <div className="sidebar-chat-section">
+                <div className="sidebar-nav-sessions">
+                  <div className="sidebar-chat-scroll" ref={sidebarChatScrollRef}>
+                    <SidebarRecentSessions
+                      open={!sidebarCollapsed}
+                      connectionId={connectionId}
+                      activeProfile={activeProfile}
+                      currentSessionId={currentSessionId}
+                      loadingSessionIds={loadingSessionIds}
+                      resumingSessionId={resumingSessionId}
+                      onSelect={handleResumeSession}
+                      onSessionDeleted={(id) => {
+                        // If the open chat was the one deleted, drop to a fresh chat
+                        // so the user isn't left viewing a now-gone conversation.
+                        if (id === currentSessionId) handleNewChat();
+                      }}
+                      scrollRootRef={sidebarChatScrollRef}
+                    />
+                  </div>
+                  {sidebarScrollbar.scrollable && (
+                    <div
+                      className={`sidebar-chat-scrollbar ${
+                        sidebarScrollbar.visible ? "visible" : ""
+                      }`}
+                      aria-hidden="true"
+                    >
+                      <div
+                        className="sidebar-chat-scrollbar-thumb"
+                        style={{
+                          height: sidebarScrollbar.height,
+                          transform: `translateY(${sidebarScrollbar.top}px)`,
+                        }}
+                      />
+                    </div>
+                  )}
                 </div>
-              )}
-            </div>
-          </div>
+              </div>
+            </>
+          ) : (
+            /* [Phone Extension Mount Start] */
+            <PhoneSidebarNav
+              activeNav={activePhoneNav}
+              onSelect={setActivePhoneNav}
+              collapsed={sidebarCollapsed}
+            />
+            /* [Phone Extension Mount End] */
+          )}
 
           <div className="sidebar-footer">
             {/* Show an upgrade affordance at startup when GitHub has a newer
@@ -895,9 +901,15 @@ function Layout({
         </aside>
 
         <main className="content">
-          {/* Doubles as the window drag strip — keep it first so it owns the top
-            band; the warning banner (if any) sits just below it. */}
-          <ActiveSessionsBar
+          {activeSuite === "phone" ? (
+            /* [Phone Extension Mount Start] */
+            <PhoneEmptyView activeNav={activePhoneNav} />
+            /* [Phone Extension Mount End] */
+          ) : (
+            <>
+              {/* Doubles as the window drag strip — keep it first so it owns the top
+                band; the warning banner (if any) sits just below it. */}
+              <ActiveSessionsBar
             runs={runs}
             activeRunId={activeRunId}
             onSelect={handleActivateRun}
@@ -1076,6 +1088,8 @@ function Layout({
                 <Gateway profile={activeProfile} />
               )}
             </div>
+          )}
+            </>
           )}
         </main>
       </div>
