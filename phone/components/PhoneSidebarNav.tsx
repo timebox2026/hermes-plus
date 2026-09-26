@@ -4,17 +4,23 @@ import {
   Plus,
   ChevronDown,
   ChevronRight,
-  Layers,
-  MessageSquare,
-  Globe,
+  Zap,
+  Hand,
+  AppWindow,
+  ShieldAlert,
+  Camera,
+  Radio,
 } from "lucide-react";
 
 export type PhoneNavId =
   | "new-work"
   | "my-phones"
-  | "omni-inbox"
-  | "social-media"
-  | "cross-border";
+  | "gateway"
+  | "touch-keys"
+  | "app-control"
+  | "system-priv"
+  | "screenshot"
+  | "event-stream";
 
 interface PhoneSidebarNavProps {
   activeNav: PhoneNavId;
@@ -27,7 +33,7 @@ export function PhoneSidebarNav({
   onSelect,
   collapsed = false,
 }: PhoneSidebarNavProps): React.JSX.Element {
-  const [appsOpen, setAppsOpen] = useState(true);
+  const [atomicOpen, setAtomicOpen] = useState(true);
 
   return (
     <>
@@ -45,7 +51,7 @@ export function PhoneSidebarNav({
           <span className="sidebar-nav-label">新工作</span>
         </button>
 
-        {/* 我的手机 */}
+        {/* 1. 基础设施：我的手机 */}
         <button
           className={`sidebar-nav-item ${activeNav === "my-phones" ? "active" : ""}`}
           onClick={() => onSelect("my-phones")}
@@ -55,55 +61,86 @@ export function PhoneSidebarNav({
           <Smartphone size={16} />
           <span className="sidebar-nav-label">我的手机</span>
         </button>
+
+        {/* 2. 基础设施：平台网关接入 */}
+        <button
+          className={`sidebar-nav-item ${activeNav === "gateway" ? "active" : ""}`}
+          onClick={() => onSelect("gateway")}
+          title="网关接入"
+          aria-label="网关接入"
+        >
+          <Zap size={16} />
+          <span className="sidebar-nav-label">网关接入</span>
+        </button>
       </nav>
 
-      {/* 应用分组：完全复用系统官方 sidebar-chat-section 与 sidebar-recent-section 样式 */}
+      {/* 原子能力演示分组：完全复用系统官方 sidebar-chat-section 与 sidebar-recent-section 样式 */}
       <div className="sidebar-chat-section" style={{ overflowY: "auto" }}>
         <div className="sidebar-recent-section">
           {!collapsed ? (
             <button
               type="button"
               className="sidebar-recent-section-toggle"
-              onClick={() => setAppsOpen(!appsOpen)}
-              aria-expanded={appsOpen}
+              onClick={() => setAtomicOpen(!atomicOpen)}
+              aria-expanded={atomicOpen}
             >
-              <span>应用</span>
-              {appsOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+              <span>原子能力演示</span>
+              {atomicOpen ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
             </button>
           ) : (
             <div className="sidebar-section-divider" style={{ margin: "8px 0" }} />
           )}
 
-          {(appsOpen || collapsed) && (
+          {(atomicOpen || collapsed) && (
             <div className="sidebar-nav sidebar-nav-pinned" style={{ paddingTop: 2 }}>
               <button
-                className={`sidebar-nav-item ${activeNav === "omni-inbox" ? "active" : ""}`}
-                onClick={() => onSelect("omni-inbox")}
-                title="消息值守"
-                aria-label="消息值守"
+                className={`sidebar-nav-item ${activeNav === "touch-keys" ? "active" : ""}`}
+                onClick={() => onSelect("touch-keys")}
+                title="触控与按键"
+                aria-label="触控与按键"
               >
-                <Layers size={16} />
-                <span className="sidebar-nav-label">消息值守</span>
+                <Hand size={16} />
+                <span className="sidebar-nav-label">触控与按键</span>
               </button>
 
               <button
-                className={`sidebar-nav-item ${activeNav === "social-media" ? "active" : ""}`}
-                onClick={() => onSelect("social-media")}
-                title="社媒运营"
-                aria-label="社媒运营"
+                className={`sidebar-nav-item ${activeNav === "app-control" ? "active" : ""}`}
+                onClick={() => onSelect("app-control")}
+                title="应用管理"
+                aria-label="应用管理"
               >
-                <MessageSquare size={16} />
-                <span className="sidebar-nav-label">社媒运营</span>
+                <AppWindow size={16} />
+                <span className="sidebar-nav-label">应用管理</span>
               </button>
 
               <button
-                className={`sidebar-nav-item ${activeNav === "cross-border" ? "active" : ""}`}
-                onClick={() => onSelect("cross-border")}
-                title="跨境电商"
-                aria-label="跨境电商"
+                className={`sidebar-nav-item ${activeNav === "system-priv" ? "active" : ""}`}
+                onClick={() => onSelect("system-priv")}
+                title="系统特权"
+                aria-label="系统特权"
               >
-                <Globe size={16} />
-                <span className="sidebar-nav-label">跨境电商</span>
+                <ShieldAlert size={16} />
+                <span className="sidebar-nav-label">系统特权</span>
+              </button>
+
+              <button
+                className={`sidebar-nav-item ${activeNav === "screenshot" ? "active" : ""}`}
+                onClick={() => onSelect("screenshot")}
+                title="单帧截图"
+                aria-label="单帧截图"
+              >
+                <Camera size={16} />
+                <span className="sidebar-nav-label">单帧截图</span>
+              </button>
+
+              <button
+                className={`sidebar-nav-item ${activeNav === "event-stream" ? "active" : ""}`}
+                onClick={() => onSelect("event-stream")}
+                title="实时事件流"
+                aria-label="实时事件流"
+              >
+                <Radio size={16} />
+                <span className="sidebar-nav-label">实时事件流</span>
               </button>
             </div>
           )}

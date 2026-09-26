@@ -58,7 +58,7 @@ import {
   PhoneSidebarNav,
   type PhoneNavId,
 } from "../../../../../phone/components/PhoneSidebarNav";
-import { PhoneEmptyView } from "../../../../../phone/views/PhoneEmptyView";
+import { PhoneMainView } from "../../../../../phone/views/PhoneMainView";
 // [Phone Extension Mount End]
 
 type View =
@@ -903,7 +903,7 @@ function Layout({
         <main className="content">
           {activeSuite === "phone" ? (
             /* [Phone Extension Mount Start] */
-            <PhoneEmptyView activeNav={activePhoneNav} />
+            <PhoneMainView activeNav={activePhoneNav} />
             /* [Phone Extension Mount End] */
           ) : (
             <>
