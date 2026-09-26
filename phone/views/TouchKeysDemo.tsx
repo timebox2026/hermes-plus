@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Hand, ArrowRight, CornerDownLeft, Play, Copy, Check } from "lucide-react";
+import { Hand, ArrowRight, Play, Copy, Check, Smartphone } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 import type { DeviceInfo } from "../sdk/types";
+import { NoDevicePrompt } from "../components/NoDevicePrompt";
 
-export function TouchKeysDemo(): React.JSX.Element {
+interface TouchKeysDemoProps {
+  onNavigateToDevices?: () => void;
+}
+
+export function TouchKeysDemo({ onNavigateToDevices }: TouchKeysDemoProps): React.JSX.Element {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [actionType, setActionType] = useState<"tap" | "swipe" | "key" | "input">("tap");
@@ -29,20 +34,23 @@ export function TouchKeysDemo(): React.JSX.Element {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    phoneClient.listDevices().then((list) => {
-      setDevices(list);
-      const saved = phoneClient.getConfig().selectedDeviceId;
-      if (saved && list.some((d) => d.deviceId === saved)) {
-        setSelectedDeviceId(saved);
-      } else if (list.length > 0) {
-        setSelectedDeviceId(list[0].deviceId);
-      }
-    }).catch(() => {});
+    phoneClient
+      .listDevices()
+      .then((list) => {
+        setDevices(list);
+        const saved = phoneClient.getConfig().selectedDeviceId;
+        if (saved && list.some((d) => d.deviceId === saved)) {
+          setSelectedDeviceId(saved);
+        } else if (list.length > 0) {
+          setSelectedDeviceId(list[0].deviceId);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleExecute = async () => {
     if (!selectedDeviceId) {
-      alert("请先选择一台真机设备");
+      alert("请先选择一台在线真机设备");
       return;
     }
     setExecuting(true);
@@ -67,16 +75,17 @@ export function TouchKeysDemo(): React.JSX.Element {
   };
 
   const getCodeSnippet = () => {
+    const target = selectedDeviceId || "848bd13e2f9";
     if (actionType === "tap") {
-      return `// TypeScript SDK\nawait phone.tap("${selectedDeviceId || "DEVICE_ID"}", ${tapX}, ${tapY});`;
+      return `// TypeScript SDK\nawait phone.tap("${target}", ${tapX}, ${tapY});`;
     }
     if (actionType === "swipe") {
-      return `// TypeScript SDK\nawait phone.swipe("${selectedDeviceId || "DEVICE_ID"}", ${swipeX1}, ${swipeY1}, ${swipeX2}, ${swipeY2}, 300);`;
+      return `// TypeScript SDK\nawait phone.swipe("${target}", ${swipeX1}, ${swipeY1}, ${swipeX2}, ${swipeY2}, 300);`;
     }
     if (actionType === "key") {
-      return `// 物理按键: 4=返回, 3=Home, 187=多任务\nawait phone.pressKey("${selectedDeviceId || "DEVICE_ID"}", ${keyCode});`;
+      return `// 物理按键: 4=返回, 3=Home, 187=多任务\nawait phone.pressKey("${target}", ${keyCode});`;
     }
-    return `// 文本拟真输入 (防封号逐字延迟)\nawait phone.inputText("${selectedDeviceId || "DEVICE_ID"}", "${inputText}", true);`;
+    return `// 文本拟真输入 (防封号逐字延迟)\nawait phone.inputText("${target}", "${inputText}", true);`;
   };
 
   const handleCopy = () => {
@@ -84,6 +93,8 @@ export function TouchKeysDemo(): React.JSX.Element {
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
   };
+
+  const hasDevice = devices.length > 0;
 
   return (
     <div style={{ padding: "28px 36px", height: "100%", overflowY: "auto", boxSizing: "border-box" }}>
@@ -95,26 +106,60 @@ export function TouchKeysDemo(): React.JSX.Element {
           驱动级物理触控注入，不依赖无障碍辅助服务，指令直达物理屏幕。
         </p>
 
-        {/* 设备选择栏 */}
-        <div style={{ padding: "14px 18px", backgroundColor: "var(--bg-secondary)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>目标真机:</span>
-          <select
-            value={selectedDeviceId}
-            onChange={(e) => setSelectedDeviceId(e.target.value)}
-            style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 13 }}
+        {/* 若无真机，展示指引卡片 */}
+        {!hasDevice ? (
+          <NoDevicePrompt onNavigateToDevices={onNavigateToDevices} />
+        ) : (
+          /* 有真机，展示设备选择栏 */
+          <div
+            style={{
+              padding: "14px 18px",
+              backgroundColor: "var(--bg-secondary)",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
           >
-            {devices.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.deviceAlias || d.deviceId} ({d.status === "ONLINE" ? "在线" : "离线"})
-              </option>
-            ))}
-          </select>
-        </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Smartphone size={16} className="text-sky-500" />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>目标真机:</span>
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                }}
+              >
+                {devices.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.deviceAlias || d.deviceId} ({d.status === "ONLINE" ? "在线" : "离线"})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>
+              ● 真机已就绪，可随时下发指令
+            </span>
+          </div>
+        )}
 
         {/* 动作类型切换 */}
         <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
           {(["tap", "swipe", "key", "input"] as const).map((type) => {
-            const labels = { tap: "单击 (ui.tap)", swipe: "滑动 (ui.swipe)", key: "物理按键 (key_event)", input: "文本输入 (ui.input)" };
+            const labels = {
+              tap: "单击 (ui.tap)",
+              swipe: "滑动 (ui.swipe)",
+              key: "物理按键 (key_event)",
+              input: "文本输入 (ui.input)",
+            };
             const active = actionType === type;
             return (
               <button
@@ -138,36 +183,81 @@ export function TouchKeysDemo(): React.JSX.Element {
           })}
         </div>
 
-        {/* 表单输入 */}
-        <div style={{ padding: 20, backgroundColor: "var(--bg-secondary)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 20 }}>
+        {/* 调试表单 */}
+        <div
+          style={{
+            padding: 20,
+            backgroundColor: "var(--bg-secondary)",
+            borderRadius: 14,
+            border: "1px solid var(--border)",
+            marginBottom: 20,
+            opacity: hasDevice ? 1 : 0.6,
+          }}
+        >
           {actionType === "tap" && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
               <div>
-                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>X 坐标 (像素)</label>
-                <input type="number" value={tapX} onChange={(e) => setTapX(Number(e.target.value))} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
+                  X 坐标 (绝对像素)
+                </label>
+                <input
+                  type="number"
+                  value={tapX}
+                  onChange={(e) => setTapX(Number(e.target.value))}
+                  disabled={!hasDevice}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>Y 坐标 (像素)</label>
-                <input type="number" value={tapY} onChange={(e) => setTapY(Number(e.target.value))} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} />
+                <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
+                  Y 坐标 (绝对像素)
+                </label>
+                <input
+                  type="number"
+                  value={tapY}
+                  onChange={(e) => setTapY(Number(e.target.value))}
+                  disabled={!hasDevice}
+                  style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }}
+                />
               </div>
             </div>
           )}
 
           {actionType === "swipe" && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr 1fr", gap: 12 }}>
-              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>起点 X1</label><input type="number" value={swipeX1} onChange={(e) => setSwipeX1(Number(e.target.value))} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
-              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>起点 Y1</label><input type="number" value={swipeY1} onChange={(e) => setSwipeY1(Number(e.target.value))} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
-              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>终点 X2</label><input type="number" value={swipeX2} onChange={(e) => setSwipeX2(Number(e.target.value))} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
-              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>终点 Y2</label><input type="number" value={swipeY2} onChange={(e) => setSwipeY2(Number(e.target.value))} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
+              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>起点 X1</label><input type="number" value={swipeX1} onChange={(e) => setSwipeX1(Number(e.target.value))} disabled={!hasDevice} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
+              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>起点 Y1</label><input type="number" value={swipeY1} onChange={(e) => setSwipeY1(Number(e.target.value))} disabled={!hasDevice} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
+              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>终点 X2</label><input type="number" value={swipeX2} onChange={(e) => setSwipeX2(Number(e.target.value))} disabled={!hasDevice} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
+              <div><label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>终点 Y2</label><input type="number" value={swipeY2} onChange={(e) => setSwipeY2(Number(e.target.value))} disabled={!hasDevice} style={{ width: "100%", padding: "8px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)" }} /></div>
             </div>
           )}
 
           {actionType === "key" && (
             <div>
-              <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>系统物理按键</label>
+              <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
+                系统物理按键
+              </label>
               <div style={{ display: "flex", gap: 10 }}>
-                {[{ label: "返回键 (Back = 4)", code: 4 }, { label: "主页键 (Home = 3)", code: 3 }, { label: "多任务键 (Recents = 187)", code: 187 }].map((k) => (
-                  <button key={k.code} type="button" onClick={() => setKeyCode(k.code)} style={{ padding: "8px 14px", borderRadius: 8, border: keyCode === k.code ? "2px solid #2563eb" : "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)", cursor: "pointer", fontSize: 13 }}>
+                {[
+                  { label: "返回键 (Back = 4)", code: 4 },
+                  { label: "主页键 (Home = 3)", code: 3 },
+                  { label: "多任务键 (Recents = 187)", code: 187 },
+                ].map((k) => (
+                  <button
+                    key={k.code}
+                    type="button"
+                    onClick={() => setKeyCode(k.code)}
+                    disabled={!hasDevice}
+                    style={{
+                      padding: "8px 14px",
+                      borderRadius: 8,
+                      border: keyCode === k.code ? "2px solid #2563eb" : "1px solid var(--border)",
+                      background: "var(--bg-primary)",
+                      color: "var(--text-primary)",
+                      cursor: hasDevice ? "pointer" : "not-allowed",
+                      fontSize: 13,
+                    }}
+                  >
                     {k.label}
                   </button>
                 ))}
@@ -177,8 +267,16 @@ export function TouchKeysDemo(): React.JSX.Element {
 
           {actionType === "input" && (
             <div>
-              <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>要输入的文本内容</label>
-              <input type="text" value={inputText} onChange={(e) => setInputText(e.target.value)} style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 13 }} />
+              <label style={{ display: "block", fontSize: 12, color: "var(--text-muted)", marginBottom: 6 }}>
+                要输入的文本内容
+              </label>
+              <input
+                type="text"
+                value={inputText}
+                onChange={(e) => setInputText(e.target.value)}
+                disabled={!hasDevice}
+                style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 13 }}
+              />
             </div>
           )}
 
@@ -186,35 +284,44 @@ export function TouchKeysDemo(): React.JSX.Element {
             <button
               type="button"
               onClick={handleExecute}
-              disabled={executing || !selectedDeviceId}
+              disabled={executing || !hasDevice}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
                 padding: "8px 22px",
                 borderRadius: 8,
-                backgroundColor: "#2563eb",
+                backgroundColor: hasDevice ? "#2563eb" : "#94a3b8",
                 color: "#ffffff",
                 border: "none",
                 fontWeight: 600,
                 fontSize: 13,
-                cursor: "pointer",
+                cursor: hasDevice ? "pointer" : "not-allowed",
               }}
             >
               <Play size={14} fill="#fff" />
-              <span>{executing ? "指令执行中..." : "向真机发送指令"}</span>
+              <span>{executing ? "指令下发中..." : "向真机发送指令"}</span>
             </button>
+            {!hasDevice && (
+              <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 12 }}>
+                请先绑定真机后启用指令下发
+              </span>
+            )}
           </div>
         </div>
 
-        {/* 代码预览与响应结果 */}
+        {/* 代码与响应结果 */}
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
-          <div style={{ backgroundColor: "#0f172a", borderRadius: 12, padding: 16, color: "#e2e8f0", fontSize: 12, position: "relative" }}>
+          <div style={{ backgroundColor: "#0f172a", borderRadius: 12, padding: 16, color: "#e2e8f0", fontSize: 12 }}>
             <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8, color: "#94a3b8" }}>
               <span>调用代码 (SDK)</span>
-              <button type="button" onClick={handleCopy} style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}>
+              <button
+                type="button"
+                onClick={handleCopy}
+                style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
+              >
                 {copied ? <Check size={13} color="#4ade80" /> : <Copy size={13} />}
-                <span>{copied ? "已复制" : "复制"}</span>
+                <span>{copied ? "已复制" : "复制代码"}</span>
               </button>
             </div>
             <pre style={{ margin: 0, fontFamily: "monospace", lineHeight: 1.6, overflowX: "auto" }}>{getCodeSnippet()}</pre>
@@ -223,7 +330,7 @@ export function TouchKeysDemo(): React.JSX.Element {
           <div style={{ backgroundColor: "#0f172a", borderRadius: 12, padding: 16, color: "#e2e8f0", fontSize: 12 }}>
             <div style={{ marginBottom: 8, color: "#94a3b8" }}>真机响应返回 (Response JSON)</div>
             <pre style={{ margin: 0, fontFamily: "monospace", lineHeight: 1.6, overflowX: "auto", maxHeight: 150 }}>
-              {responseJson ? JSON.stringify(responseJson, null, 2) : "// 等待下发指令查看真实真机返回..."}
+              {responseJson ? JSON.stringify(responseJson, null, 2) : hasDevice ? "// 等待下发指令查看真实真机返回..." : "// 尚未连接真机设备"}
             </pre>
           </div>
         </div>

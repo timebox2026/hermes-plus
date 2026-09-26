@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Zap, CheckCircle2, AlertCircle, RefreshCw, KeyRound, Globe, Trash2 } from "lucide-react";
+import { Zap, Trash2 } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 
 interface LogMessage {
@@ -44,12 +44,9 @@ export function GatewayView(): React.JSX.Element {
     addLog("⚡ 正在探测网关节点通信状态...", "info");
 
     try {
-      // 1. 探测并换取 AppKey
+      // 只探测连通性，绝不重新申请 AppKey（一机一密，严禁随意生成）
       addLog(`📡 正在连接服务节点: ${config.gatewayUrl}`, "info");
-      const appKey = await phoneClient.authMachine("DEV-DESKTOP-CLIENT");
-      addLog(`🔑 设备认证成功，已同步最新凭证: ${appKey.substring(0, 10)}...`, "success");
 
-      // 2. 检查设备通道
       addLog("📦 正在同步系统组件 [PKG-01] ...", "info");
       addLog("✅ 组件 [PKG-01] 同步完成", "success");
       addLog("📥 正在拉取规则集 [PKG-02] ...", "info");
@@ -58,10 +55,11 @@ export function GatewayView(): React.JSX.Element {
 
       const devices = await phoneClient.listDevices();
       addLog(`📱 通信信道就绪，当前发现 ${devices.length} 台在线设备`, "success");
-      addLog("🎉 【更新完成】服务节点已全部就绪！运行环境已就绪！", "success");
+      addLog("🎉 【探测完成】网关连接正常，AppKey 凭证有效！", "success");
       setIsConnected(true);
     } catch (err: any) {
-      addLog(`❌ 连接网关失败: ${err?.message || "网络不可达，请检查网关是否启动"}`, "error");
+      addLog(`❌ 网关连接失败: ${err?.message || "网络不可达，请检查网关是否已启动"}`, "error");
+      addLog("💡 提示：请先在下方填写正确的 Gateway URL 和 AppKey，然后点击保存。", "warn");
       setIsConnected(false);
     } finally {
       setBusy(false);
@@ -285,9 +283,14 @@ export function GatewayView(): React.JSX.Element {
             </div>
 
             <div>
-              <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--text-muted, #71717a)", marginBottom: 6 }}>
-                开发者 AppKey (X-AppKey 凭证)
-              </label>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted, #71717a)" }}>
+                  开发者 AppKey (X-AppKey 凭证)
+                </label>
+                <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, letterSpacing: "0.01em" }}>
+                  🔐 一机一密 · 机器唯一绑定
+                </span>
+              </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
                   type="text"
@@ -303,29 +306,28 @@ export function GatewayView(): React.JSX.Element {
                     backgroundColor: "var(--bg-primary, #ffffff)",
                     color: "var(--text-primary, #111)",
                   }}
-                  placeholder="sk-lh-xxxxxxxxxxxxxxxx"
+                  placeholder="sk-lh-xxxxxxxxxxxxxxxx（由网关首次初始化时颁发）"
                 />
                 <button
                   type="button"
-                  onClick={async () => {
-                    try {
-                      const key = await phoneClient.authMachine();
-                      setConfig((prev) => ({ ...prev, appKey: key }));
-                    } catch (err: any) {
-                      alert(err?.message || "获取失败");
-                    }
-                  }}
+                  onClick={handleSaveConfig}
                   style={{
                     padding: "8px 16px",
                     borderRadius: 8,
-                    backgroundColor: "var(--bg-tertiary, #f4f4f5)",
-                    border: "1px solid var(--border, #e5e5e5)",
+                    backgroundColor: "#2563eb",
+                    color: "#ffffff",
+                    border: "none",
                     fontSize: 13,
+                    fontWeight: 600,
                     cursor: "pointer",
                   }}
                 >
-                  重新生成
+                  保存凭证
                 </button>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--text-muted, #71717a)", marginTop: 6, lineHeight: 1.5 }}>
+                ⚠️ AppKey 由网关服务在初始化时唯一颁发，与当前物理机器绑定。<br />
+                严禁随意重新申请——同一台机器始终使用同一个 Key，即「一机一密」。
               </div>
             </div>
           </div>

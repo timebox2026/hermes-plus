@@ -1,13 +1,19 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Radio, Power, Trash2, Bell, Heart, Activity } from "lucide-react";
+import { Radio, Power, Trash2, Bell, Activity, AlertTriangle } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 import type { GuardEventPayload } from "../sdk/types";
 
-export function EventStreamDemo(): React.JSX.Element {
+interface EventStreamDemoProps {
+  onNavigateToGateway?: () => void;
+}
+
+export function EventStreamDemo({ onNavigateToGateway }: EventStreamDemoProps): React.JSX.Element {
   const [listening, setListening] = useState(false);
   const [events, setEvents] = useState<GuardEventPayload[]>([]);
   const closeRef = useRef<(() => void) | null>(null);
   const consoleRef = useRef<HTMLDivElement>(null);
+  const config = phoneClient.getConfig();
+  const isConfigured = Boolean(config.gatewayUrl && config.appKey);
 
   useEffect(() => {
     if (consoleRef.current) {
@@ -61,12 +67,12 @@ export function EventStreamDemo(): React.JSX.Element {
                 width: 10,
                 height: 10,
                 borderRadius: "50%",
-                backgroundColor: listening ? "#16a34a" : "#9ca3af",
+                backgroundColor: listening ? "#16a34a" : isConfigured ? "#9ca3af" : "#f59e0b",
                 boxShadow: listening ? "0 0 8px #16a34a" : "none",
               }}
             />
             <span style={{ fontSize: 13, fontWeight: 600, color: "var(--text-primary)" }}>
-              {listening ? "SSE 事件通道已激活 (监听中)" : "SSE 通道未连接"}
+              {listening ? "SSE 事件通道已激活 (监听中)" : isConfigured ? "SSE 通道未连接" : "尚未配置网关"}
             </span>
             <span style={{ fontSize: 12, color: "var(--text-muted)" }}>
               (端点: /gateway/sse)
@@ -77,18 +83,20 @@ export function EventStreamDemo(): React.JSX.Element {
             <button
               type="button"
               onClick={toggleListen}
+              disabled={!isConfigured}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
                 padding: "7px 16px",
                 borderRadius: 8,
-                backgroundColor: listening ? "#ef4444" : "#2563eb",
+                backgroundColor: !isConfigured ? "#9ca3af" : listening ? "#ef4444" : "#2563eb",
                 color: "#ffffff",
                 border: "none",
                 fontWeight: 600,
                 fontSize: 13,
-                cursor: "pointer",
+                cursor: !isConfigured ? "not-allowed" : "pointer",
+                opacity: !isConfigured ? 0.6 : 1,
               }}
             >
               <Power size={14} />
@@ -136,7 +144,24 @@ export function EventStreamDemo(): React.JSX.Element {
         >
           {events.length === 0 ? (
             <div style={{ color: "#64748b", padding: 20, textAlign: "center" }}>
-              {listening ? "正在等待真机事件推送（如心跳、微信新消息、短信等）..." : "点击上方“开始监听事件”激活 SSE 长连接"}
+              {!isConfigured ? (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+                  <AlertTriangle size={20} color="#f59e0b" />
+                  <div style={{ color: "#f59e0b", fontWeight: 600 }}>尚未配置网关和 AppKey</div>
+                  <div style={{ fontSize: 12, maxWidth: 420, lineHeight: 1.6 }}>
+                    请先前往《网关接入》页面，配置网关地址和 AppKey 后再返回这里监听事件流。
+                  </div>
+                  {onNavigateToGateway && (
+                    <button
+                      type="button"
+                      onClick={onNavigateToGateway}
+                      style={{ marginTop: 4, padding: "6px 16px", borderRadius: 8, backgroundColor: "#2563eb", color: "#fff", border: "none", fontSize: 12, fontWeight: 600, cursor: "pointer" }}
+                    >
+                      前往配置网关
+                    </button>
+                  )}
+                </div>
+              ) : listening ? "正在等待真机事件推送（如心跳、微信新消息、短信等）..." : "点击上方“开始监听事件”激活 SSE 长连接"}
             </div>
           ) : (
             events.map((ev, idx) => {

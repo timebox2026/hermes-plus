@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Camera, Play, Copy, Check, Eye, Code } from "lucide-react";
+import { Camera, Copy, Check, Eye } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 import type { DeviceInfo, ScreenshotResponse } from "../sdk/types";
+import { NoDevicePrompt } from "../components/NoDevicePrompt";
 
-export function ScreenshotDemo(): React.JSX.Element {
+interface ScreenshotDemoProps {
+  onNavigateToDevices?: () => void;
+}
+
+export function ScreenshotDemo({ onNavigateToDevices }: ScreenshotDemoProps): React.JSX.Element {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [quality, setQuality] = useState(50);
@@ -52,6 +57,11 @@ export function ScreenshotDemo(): React.JSX.Element {
           获取高质量单帧 Base64 截图与真实宽高分辨率，用于多模态视觉大模型（GPT-4o / Claude 3.5 / Qwen-VL）决策闭环。
         </p>
 
+        {/* 无真机提示 */}
+        {devices.length === 0 && (
+          <NoDevicePrompt onNavigateToDevices={onNavigateToDevices} />
+        )}
+
         {/* 目标设备选择与参数 */}
         <div style={{ padding: 20, backgroundColor: "var(--bg-secondary)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 20 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14, marginBottom: 16 }}>
@@ -84,19 +94,20 @@ export function ScreenshotDemo(): React.JSX.Element {
           <button
             type="button"
             onClick={handleCapture}
-            disabled={executing || !selectedDeviceId}
+            disabled={executing || !selectedDeviceId || devices.length === 0}
             style={{
               display: "inline-flex",
               alignItems: "center",
               gap: 6,
               padding: "8px 22px",
               borderRadius: 8,
-              backgroundColor: "#2563eb",
+              backgroundColor: devices.length === 0 ? "#9ca3af" : "#2563eb",
               color: "#ffffff",
               border: "none",
               fontWeight: 600,
               fontSize: 13,
-              cursor: "pointer",
+              cursor: devices.length === 0 ? "not-allowed" : "pointer",
+              opacity: devices.length === 0 ? 0.6 : 1,
             }}
           >
             <Camera size={15} />

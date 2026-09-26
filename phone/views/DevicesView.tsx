@@ -226,7 +226,7 @@ export function DevicesView(): React.JSX.Element {
             暂无绑定手机
           </h3>
           <p style={{ fontSize: 13, maxWidth: 360, margin: "0 0 20px 0" }}>
-            请确保手机连接至同一网络，点击下方按钮生成二维码，使用手机扫码即可入网。
+            点击下方按钮生成二维码，使用手机扫码即可入网。
           </p>
           <button
             type="button"

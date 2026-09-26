@@ -1,9 +1,14 @@
 import React, { useState, useEffect } from "react";
-import { Unlock, Bell, Image, Play, Copy, Check, Sparkles } from "lucide-react";
+import { Unlock, Bell, Image, Play, Copy, Check, Sparkles, Smartphone } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 import type { DeviceInfo } from "../sdk/types";
+import { NoDevicePrompt } from "../components/NoDevicePrompt";
 
-export function SystemPrivDemo(): React.JSX.Element {
+interface SystemPrivDemoProps {
+  onNavigateToDevices?: () => void;
+}
+
+export function SystemPrivDemo({ onNavigateToDevices }: SystemPrivDemoProps): React.JSX.Element {
   const [devices, setDevices] = useState<DeviceInfo[]>([]);
   const [selectedDeviceId, setSelectedDeviceId] = useState<string>("");
   const [activeTab, setActiveTab] = useState<"unlock" | "bar" | "image">("unlock");
@@ -16,19 +21,22 @@ export function SystemPrivDemo(): React.JSX.Element {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    phoneClient.listDevices().then((list) => {
-      setDevices(list);
-      const saved = phoneClient.getConfig().selectedDeviceId;
-      if (saved && list.some((d) => d.deviceId === saved)) {
-        setSelectedDeviceId(saved);
-      } else if (list.length > 0) {
-        setSelectedDeviceId(list[0].deviceId);
-      }
-    }).catch(() => {});
+    phoneClient
+      .listDevices()
+      .then((list) => {
+        setDevices(list);
+        const saved = phoneClient.getConfig().selectedDeviceId;
+        if (saved && list.some((d) => d.deviceId === saved)) {
+          setSelectedDeviceId(saved);
+        } else if (list.length > 0) {
+          setSelectedDeviceId(list[0].deviceId);
+        }
+      })
+      .catch(() => {});
   }, []);
 
   const handleExecute = async () => {
-    if (!selectedDeviceId) return alert("请先选择一台真机设备");
+    if (!selectedDeviceId) return alert("请先选择一台在线真机设备");
     setExecuting(true);
     setResponseJson(null);
     try {
@@ -48,14 +56,17 @@ export function SystemPrivDemo(): React.JSX.Element {
     }
   };
 
+  const hasDevice = devices.length > 0;
+  const target = selectedDeviceId || "848bd13e2f9";
+
   const getCodeSnippet = () => {
     if (activeTab === "unlock") {
-      return `// 唤醒屏幕并自动解锁\nawait phone.unlock("${selectedDeviceId || "DEVICE_ID"}");`;
+      return `// 唤醒屏幕并自动解锁\nawait phone.unlock("${target}");`;
     }
     if (activeTab === "bar") {
-      return `// 下拉系统通知栏\nawait phone.openBar("${selectedDeviceId || "DEVICE_ID"}", "NOTIFICATION");`;
+      return `// 下拉系统通知栏\nawait phone.openBar("${target}", "NOTIFICATION");`;
     }
-    return `// 相册无感注入：写入相册并强制广播刷新置顶第1张\nawait phone.downloadImage("${selectedDeviceId || "DEVICE_ID"}", [\n  "${imageUrl}"\n]);`;
+    return `// 相册无感注入：写入相册并强制广播刷新置顶第1张\nawait phone.downloadImage("${target}", [\n  "${imageUrl}"\n]);`;
   };
 
   return (
@@ -68,21 +79,49 @@ export function SystemPrivDemo(): React.JSX.Element {
           平台 Root 级系统特权：包括唤醒解锁、通知栏拉取、以及<strong>将网络图片直接注入手机相册并置顶第一张</strong>。
         </p>
 
-        {/* 目标设备选择 */}
-        <div style={{ padding: "14px 18px", backgroundColor: "var(--bg-secondary)", borderRadius: 12, border: "1px solid var(--border)", marginBottom: 20, display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 13, fontWeight: 600 }}>目标真机:</span>
-          <select
-            value={selectedDeviceId}
-            onChange={(e) => setSelectedDeviceId(e.target.value)}
-            style={{ padding: "6px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 13 }}
+        {/* 若无真机展示指引 */}
+        {!hasDevice ? (
+          <NoDevicePrompt onNavigateToDevices={onNavigateToDevices} />
+        ) : (
+          <div
+            style={{
+              padding: "14px 18px",
+              backgroundColor: "var(--bg-secondary)",
+              borderRadius: 12,
+              border: "1px solid var(--border)",
+              marginBottom: 20,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+            }}
           >
-            {devices.map((d) => (
-              <option key={d.deviceId} value={d.deviceId}>
-                {d.deviceAlias || d.deviceId} ({d.status === "ONLINE" ? "在线" : "离线"})
-              </option>
-            ))}
-          </select>
-        </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <Smartphone size={16} className="text-sky-500" />
+              <span style={{ fontSize: 13, fontWeight: 600 }}>目标真机:</span>
+              <select
+                value={selectedDeviceId}
+                onChange={(e) => setSelectedDeviceId(e.target.value)}
+                style={{
+                  padding: "6px 12px",
+                  borderRadius: 8,
+                  border: "1px solid var(--border)",
+                  background: "var(--bg-primary)",
+                  color: "var(--text-primary)",
+                  fontSize: 13,
+                }}
+              >
+                {devices.map((d) => (
+                  <option key={d.deviceId} value={d.deviceId}>
+                    {d.deviceAlias || d.deviceId} ({d.status === "ONLINE" ? "在线" : "离线"})
+                  </option>
+                ))}
+              </select>
+            </div>
+            <span style={{ fontSize: 12, color: "#16a34a", fontWeight: 500 }}>
+              ● 真机已就绪
+            </span>
+          </div>
+        )}
 
         {/* 标签切换 */}
         <div style={{ display: "flex", gap: 10, marginBottom: 20 }}>
@@ -120,7 +159,16 @@ export function SystemPrivDemo(): React.JSX.Element {
         </div>
 
         {/* 输入区 */}
-        <div style={{ padding: 20, backgroundColor: "var(--bg-secondary)", borderRadius: 14, border: "1px solid var(--border)", marginBottom: 20 }}>
+        <div
+          style={{
+            padding: 20,
+            backgroundColor: "var(--bg-secondary)",
+            borderRadius: 14,
+            border: "1px solid var(--border)",
+            marginBottom: 20,
+            opacity: hasDevice ? 1 : 0.6,
+          }}
+        >
           {activeTab === "unlock" && (
             <p style={{ fontSize: 13, color: "var(--text-secondary)", margin: 0 }}>
               点击下方按钮，若当前手机处于息屏锁屏状态，系统将强制点亮屏幕并穿透锁屏，使手机处于可立即操控的主屏幕状态。
@@ -142,6 +190,7 @@ export function SystemPrivDemo(): React.JSX.Element {
                 type="text"
                 value={imageUrl}
                 onChange={(e) => setImageUrl(e.target.value)}
+                disabled={!hasDevice}
                 style={{ width: "100%", padding: "8px 12px", borderRadius: 8, border: "1px solid var(--border)", background: "var(--bg-primary)", color: "var(--text-primary)", fontSize: 13, marginBottom: 12 }}
               />
               <div style={{ fontSize: 12, color: "#16a34a", display: "flex", alignItems: "center", gap: 4 }}>
@@ -155,24 +204,29 @@ export function SystemPrivDemo(): React.JSX.Element {
             <button
               type="button"
               onClick={handleExecute}
-              disabled={executing || !selectedDeviceId}
+              disabled={executing || !hasDevice}
               style={{
                 display: "inline-flex",
                 alignItems: "center",
                 gap: 6,
                 padding: "8px 22px",
                 borderRadius: 8,
-                backgroundColor: "#2563eb",
+                backgroundColor: hasDevice ? "#2563eb" : "#94a3b8",
                 color: "#ffffff",
                 border: "none",
                 fontWeight: 600,
                 fontSize: 13,
-                cursor: "pointer",
+                cursor: hasDevice ? "pointer" : "not-allowed",
               }}
             >
               <Play size={14} fill="#fff" />
               <span>{executing ? "指令下发中..." : "向真机下发特权指令"}</span>
             </button>
+            {!hasDevice && (
+              <span style={{ fontSize: 12, color: "var(--text-muted)", marginLeft: 12 }}>
+                请先绑定真机后启用特权下发
+              </span>
+            )}
           </div>
         </div>
 
@@ -191,7 +245,7 @@ export function SystemPrivDemo(): React.JSX.Element {
                 style={{ background: "transparent", border: "none", color: "#94a3b8", cursor: "pointer", display: "flex", alignItems: "center", gap: 4 }}
               >
                 {copied ? <Check size={13} color="#4ade80" /> : <Copy size={13} />}
-                <span>{copied ? "已复制" : "复制"}</span>
+                <span>{copied ? "已复制" : "复制代码"}</span>
               </button>
             </div>
             <pre style={{ margin: 0, fontFamily: "monospace", lineHeight: 1.6, overflowX: "auto" }}>{getCodeSnippet()}</pre>
@@ -200,7 +254,7 @@ export function SystemPrivDemo(): React.JSX.Element {
           <div style={{ backgroundColor: "#0f172a", borderRadius: 12, padding: 16, color: "#e2e8f0", fontSize: 12 }}>
             <div style={{ marginBottom: 8, color: "#94a3b8" }}>真机响应返回 (Response JSON)</div>
             <pre style={{ margin: 0, fontFamily: "monospace", lineHeight: 1.6, overflowX: "auto", maxHeight: 160 }}>
-              {responseJson ? JSON.stringify(responseJson, null, 2) : "// 等待下发指令查看真实真机返回..."}
+              {responseJson ? JSON.stringify(responseJson, null, 2) : hasDevice ? "// 等待下发指令查看真实真机返回..." : "// 尚未连接真机设备"}
             </pre>
           </div>
         </div>

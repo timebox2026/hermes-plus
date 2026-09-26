@@ -10,24 +10,35 @@ import { EventStreamDemo } from "./EventStreamDemo";
 
 interface PhoneMainViewProps {
   activeNav: PhoneNavId;
+  onNavigate?: (nav: PhoneNavId) => void;
 }
 
-export function PhoneMainView({ activeNav }: PhoneMainViewProps): React.JSX.Element {
+export function PhoneMainView({
+  activeNav,
+  onNavigate,
+}: PhoneMainViewProps): React.JSX.Element {
+  const goToDevices = () => {
+    if (onNavigate) onNavigate("my-phones");
+  };
+  const goToGateway = () => {
+    if (onNavigate) onNavigate("gateway");
+  };
+
   switch (activeNav) {
     case "my-phones":
       return <DevicesView />;
     case "gateway":
       return <GatewayView />;
     case "touch-keys":
-      return <TouchKeysDemo />;
+      return <TouchKeysDemo onNavigateToDevices={goToDevices} />;
     case "app-control":
-      return <AppControlDemo />;
+      return <AppControlDemo onNavigateToDevices={goToDevices} />;
     case "system-priv":
-      return <SystemPrivDemo />;
+      return <SystemPrivDemo onNavigateToDevices={goToDevices} />;
     case "screenshot":
-      return <ScreenshotDemo />;
+      return <ScreenshotDemo onNavigateToDevices={goToDevices} />;
     case "event-stream":
-      return <EventStreamDemo />;
+      return <EventStreamDemo onNavigateToGateway={goToGateway} />;
     case "new-work":
       return <DevicesView />;
     default:
