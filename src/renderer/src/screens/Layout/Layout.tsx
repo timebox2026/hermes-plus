@@ -53,8 +53,8 @@ import type { LucideIcon } from "lucide-react";
 import { useI18n } from "../../components/useI18n";
 
 // [Phone Extension Mount Start]
-import { PhoneWorkspace } from "../../../../../phone/views/PhoneWorkspace";
-import { Smartphone } from "lucide-react";
+import { PhoneLayout } from "../../../../../phone/views/PhoneLayout";
+import { SuiteSwitcher } from "../../../../../phone/components/SuiteSwitcher";
 // [Phone Extension Mount End]
 
 type View =
@@ -68,10 +68,7 @@ type View =
   | "tools"
   | "schedules"
   | "kanban"
-  | "gateway"
-  // [Phone Extension Mount Start]
-  | "phone";
-  // [Phone Extension Mount End]
+  | "gateway";
 
 const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   { view: "discover", icon: Compass, labelKey: "navigation.discover" },
@@ -82,9 +79,6 @@ const PINNED_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
   // "skills" lives under the Discover tab (installed + community), so it's no
   // longer a top-level nav item.
   { view: "schedules", icon: Timer, labelKey: "navigation.schedules" },
-  // [Phone Extension Mount Start]
-  { view: "phone", icon: Smartphone, labelKey: "AI 手机" },
-  // [Phone Extension Mount End]
 ];
 
 const FOOTER_NAV_ITEMS: { view: View; icon: LucideIcon; labelKey: string }[] = [
@@ -270,6 +264,25 @@ function Layout({
       return false;
     }
   });
+
+  // [Phone Extension Mount Start]
+  const [activeSuite, setActiveSuite] = useState<"hermes" | "phone">(() => {
+    try {
+      return (localStorage.getItem("hermes.activeSuite") as "hermes" | "phone") || "hermes";
+    } catch {
+      return "hermes";
+    }
+  });
+
+  const handleSuiteChange = useCallback((suite: "hermes" | "phone") => {
+    setActiveSuite(suite);
+    try {
+      localStorage.setItem("hermes.activeSuite", suite);
+    } catch {
+      /* ignore */
+    }
+  }, []);
+  // [Phone Extension Mount End]
   // Full-list sessions modal (opened from the sidebar "Show more" affordance or
   // the Cmd/Ctrl+K menu action). Reuses the Sessions screen inside a modal —
   // there is no longer a top-level Sessions view.
@@ -694,6 +707,18 @@ function Layout({
     ? t("navigation.expandSidebar")
     : t("navigation.collapseSidebar");
 
+  // [Phone Extension Mount Start]
+  if (activeSuite === "phone") {
+    return (
+      <PhoneLayout
+        onSuiteChange={handleSuiteChange}
+        sidebarCollapsed={sidebarCollapsed}
+        toggleSidebar={toggleSidebar}
+      />
+    );
+  }
+  // [Phone Extension Mount End]
+
   return (
     <div className="layout-shell">
       <div className={`layout ${sidebarCollapsed ? "sidebar-collapsed" : ""}`}>
@@ -723,6 +748,14 @@ function Layout({
               )}
             </button>
           </div>
+
+          {/* [Phone Extension Mount Start] */}
+          <SuiteSwitcher
+            activeSuite={activeSuite}
+            onChange={handleSuiteChange}
+            collapsed={sidebarCollapsed}
+          />
+          {/* [Phone Extension Mount End] */}
 
           <nav className="sidebar-nav sidebar-nav-pinned">
             <button
@@ -1044,14 +1077,6 @@ function Layout({
               )}
             </div>
           )}
-
-          {/* [Phone Extension Mount Start] */}
-          {visitedViews.has("phone") && (
-            <div style={paneStyle("phone")}>
-              <PhoneWorkspace />
-            </div>
-          )}
-          {/* [Phone Extension Mount End] */}
         </main>
       </div>
       <StatusBar activeProfile={activeProfile} />

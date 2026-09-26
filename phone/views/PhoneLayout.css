@@ -1,0 +1,223 @@
+/* 手机套件整体布局 */
+.phone-layout-shell {
+  display: flex;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: var(--bg-primary, #ffffff);
+  color: var(--text-primary, #18181b);
+}
+
+/* 左侧手机侧边栏 */
+.phone-sidebar {
+  width: 240px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  background-color: var(--bg-secondary, #f4f4f5);
+  border-right: 1px solid var(--border, #e4e4e7);
+  box-sizing: border-box;
+  flex-shrink: 0;
+  transition: width 0.2s ease;
+}
+
+.phone-layout-shell.collapsed .phone-sidebar {
+  width: 68px;
+}
+
+/* 侧边栏头部 */
+.phone-sidebar-header {
+  height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  flex-shrink: 0;
+}
+
+.phone-sidebar-brand-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: -0.2px;
+  color: var(--text-primary, #18181b);
+}
+
+.phone-sidebar-collapse-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted, #71717a);
+  padding: 4px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.phone-sidebar-collapse-btn:hover {
+  background: var(--bg-tertiary, #e4e4e7);
+  color: var(--text-primary, #18181b);
+}
+
+/* 导航区 */
+.phone-sidebar-nav {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* + 新工作 按钮 (与截图中一致的药丸底色与样式) */
+.phone-new-work-btn {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 8px;
+  width: 100%;
+  height: 38px;
+  padding: 0 12px;
+  border-radius: 10px;
+  border: none;
+  background-color: rgba(59, 130, 246, 0.12);
+  color: #2563eb;
+  font-size: 13.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  margin-bottom: 6px;
+}
+
+.phone-new-work-btn:hover {
+  background-color: rgba(59, 130, 246, 0.18);
+  transform: translateY(-0.5px);
+}
+
+.phone-new-work-btn:active {
+  transform: translateY(0.5px);
+}
+
+/* 普通导航项 */
+.phone-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 8px;
+  border: none;
+  background: transparent;
+  color: var(--text-secondary, #3f3f46);
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+
+.phone-nav-item:hover {
+  background-color: var(--bg-tertiary, rgba(0, 0, 0, 0.04));
+  color: var(--text-primary, #18181b);
+}
+
+.phone-nav-item.active {
+  background-color: var(--bg-tertiary, rgba(0, 0, 0, 0.08));
+  color: var(--text-primary, #09090b);
+  font-weight: 600;
+}
+
+/* 应用 分组 */
+.phone-nav-group {
+  margin-top: 14px;
+}
+
+.phone-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: 6px 12px;
+  background: transparent;
+  border: none;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted, #71717a);
+  cursor: pointer;
+  user-select: none;
+}
+
+.phone-group-header:hover {
+  color: var(--text-primary, #18181b);
+}
+
+.phone-group-divider {
+  height: 1px;
+  background: var(--border, #e4e4e7);
+  margin: 8px 12px;
+}
+
+.phone-group-items {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 4px;
+}
+
+/* 底部区域 */
+.phone-sidebar-footer {
+  padding: 8px;
+  border-top: 1px solid var(--border, #e4e4e7);
+  flex-shrink: 0;
+}
+
+.phone-footer-btn {
+  color: var(--text-muted, #71717a);
+}
+
+/* 右侧主工作区容器 */
+.phone-main-container {
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  background-color: var(--bg-primary, #ffffff);
+}
+
+/* 占位页面卡片 */
+.phone-placeholder-view {
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px;
+  background: var(--bg-primary, #ffffff);
+}
+
+.phone-placeholder-card {
+  max-width: 420px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.phone-placeholder-icon {
+  margin-bottom: 8px;
+}
+
+.phone-placeholder-card h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0;
+  color: var(--text-primary, #18181b);
+}
+
+.phone-placeholder-card p {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: var(--text-muted, #71717a);
+  margin: 0;
+}

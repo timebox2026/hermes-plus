@@ -1,6 +1,6 @@
-# 上游同步与极小改动开发指南 (Upstream Sync & Modification Guide)
+# 上游同步与极小改动开发指南 (Upstream Sync & Minimal Diffs Guide)
 
-> **面向开发者**：本项目是基于上游官方开源项目 [`fathah/hermes-desktop`](https://github.com/fathah/hermes-desktop) 扩展而来的开源脚手架。
+> **面向开发者**：本项目是基于上游官方开源项目 [`fathah/hermes-desktop`](https://github.com/fathah/hermes-desktop) 扩展而来的双模式桌面应用（电脑 Agent + 手机操控套件）。
 > 为了让您随时能够无缝合并官方的最新特性与 Bug 修复，我们采用了 **“极低侵入性架构（Low-Intrusion Architecture）”**。
 
 ---
@@ -9,12 +9,12 @@
 
 ```
 hermes-plus/
-├── src/                    # 100% 官方原版代码 (电脑端 Agent、模型管理、聊天与设置)
+├── src/                    # 官方原版代码 (电脑端 Agent、模型管理、聊天与设置)
 │
 ├── phone/                  # 【浪花 AI 手机控制核心板块】(全新自包含目录，与上游完全物理隔离)
 │   ├── api/                # 网关通信 (HTTP 指令、SSE 事件监听、WebRTC 实时推流)
-│   ├── components/         # 独立 React 组件 (设备卡片、投屏视窗、物理遥控手势、事件终端)
-│   ├── views/              # 手机工作台主页面 (PhoneWorkspace.tsx)
+│   ├── components/         # 独立 React 组件 (SuiteSwitcher 切换器、设备卡片、投屏视窗、物理遥控、设置)
+│   ├── views/              # 手机套件视图 (PhoneLayout 侧边栏框架、PhoneWorkspace 工作台)
 │   ├── main/               # 手机模块 Electron IPC 主进程通道
 │   └── types/              # 手机、技能、串流标准类型定义
 │
@@ -22,14 +22,15 @@ hermes-plus/
 ```
 
 **核心设计原则**：
-- **凡是手机操控、投屏相关的业务逻辑，100% 编写在 `phone/` 目录下**。
+- **手机模式与电脑模式分层**：在左侧栏顶部通过 `[ 💻 电脑 ] [ 📱 手机 ]` 双套件选项卡无缝切换。
+- **业务代码 100% 隔离**：凡是手机操控、投屏相关的业务逻辑，100% 编写在顶层 `phone/` 目录下。
 - **对官方上游 `src/` 的核心改动严格限制在极少数“挂载点”**，且所有改动均带有清晰的 `// [Phone Extension Mount]` 标记。
 
 ---
 
 ## 2. 上游核心代码精确改动清单 (Exact Diffs)
 
-我们在上游源码中仅改动了以下 3 个文件：
+我们在上游源码中仅改动了以下 2 个文件：
 
 ### 改动 1：主进程挂载 (`src/main/app/start.ts`)
 - **改动目的**：在 Electron 主进程中注册手机模块的 IPC 监听通道。
@@ -53,94 +54,99 @@ hermes-plus/
 
 ---
 
-### 改动 2：界面导航挂载 (`src/renderer/src/screens/Layout/Layout.tsx`)
-- **改动目的**：在侧边栏导航增加“AI 手机”标签页，选中时渲染 `<PhoneWorkspace />`。
+### 改动 2：界面顶部 Tabs 挂载 (`src/renderer/src/screens/Layout/Layout.tsx`)
+- **改动目的**：
+  1. 在侧边栏最顶部挂载 `SuiteSwitcher`（`[ 💻 电脑 ] [ 📱 手机 ]` 药丸胶囊选项卡）。
+  2. 当处于 `phone` 模式时，渲染自包含的 `<PhoneLayout />`（包含手机工作台侧边栏：`+ 新工作`、`我的手机`、`应用分组` 等）。
 - **改动位置与代码**：
 
 ```diff
 + // [Phone Extension Mount Start]
-+ import { PhoneWorkspace } from "../../../../../phone/views/PhoneWorkspace";
-+ import { Smartphone } from "lucide-react";
++ import { PhoneLayout } from "../../../../../phone/views/PhoneLayout";
++ import { SuiteSwitcher } from "../../../../../phone/components/SuiteSwitcher";
 + // [Phone Extension Mount End]
 
-  type View =
-    | "chat"
-    | "discover"
-    | ...
-+   // [Phone Extension Mount Start]
-+   | "phone";
-+   // [Phone Extension Mount End]
++ // [Phone Extension Mount Start]
++ const [activeSuite, setActiveSuite] = useState<"hermes" | "phone">(() => {
++   try {
++     return (localStorage.getItem("hermes.activeSuite") as "hermes" | "phone") || "hermes";
++   } catch {
++     return "hermes";
++   }
++ });
++ const handleSuiteChange = useCallback((suite: "hermes" | "phone") => {
++   setActiveSuite(suite);
++   try { localStorage.setItem("hermes.activeSuite", suite); } catch {}
++ }, []);
++ // [Phone Extension Mount End]
 
-  const PINNED_NAV_ITEMS = [
-    { view: "office", ... },
-    { view: "kanban", ... },
-    { view: "schedules", ... },
-+   // [Phone Extension Mount Start]
-+   { view: "phone", icon: Smartphone, labelKey: "AI 手机" },
-+   // [Phone Extension Mount End]
-  ];
++ // [Phone Extension Mount Start]
++ if (activeSuite === "phone") {
++   return (
++     <PhoneLayout
++       onSuiteChange={handleSuiteChange}
++       sidebarCollapsed={sidebarCollapsed}
++       toggleSidebar={toggleSidebar}
++     />
++   );
++ }
++ // [Phone Extension Mount End]
 
-  // 在右侧主视窗中增加条件渲染：
-+ {/* [Phone Extension Mount Start] */}
-+ {visitedViews.has("phone") && (
-+   <div style={paneStyle("phone")}>
-+     <PhoneWorkspace />
-+   </div>
-+ )}
-+ {/* [Phone Extension Mount End] */}
+  <aside className="sidebar">
+    <div className="sidebar-brand">
+      ...
+    </div>
+
++   {/* [Phone Extension Mount Start] */}
++   <SuiteSwitcher
++     activeSuite={activeSuite}
++     onChange={handleSuiteChange}
++     collapsed={sidebarCollapsed}
++   />
++   {/* [Phone Extension Mount End] */}
 ```
 
 ---
 
-### 改动 3：TypeScript 路径包含 (`tsconfig.web.json` & `tsconfig.node.json`)
-- **改动目的**：让构建工具将 `phone/` 目录纳入 TypeScript 编译与热更新监听。
-- **改动位置与代码**：
-
-```diff
-  "include": [
-    "src/renderer/src/**/*",
-    "src/shared/**/*",
-+   "phone/**/*"
-  ]
-```
+### 改动 3：工程配置 (`package.json`)
+- 仅将包名标识为 `"name": "hermes-plus"`。
 
 ---
 
-## 3. 下次拉取上游官方代码的标准流程
+## 3. 当官方上游发新版时，如何同步更新？
 
-当官方 [`fathah/hermes-desktop`](https://github.com/fathah/hermes-desktop) 仓库发布了新版本（或修复了 Electron 漏洞）时，请按以下 3 步平滑同步：
+因为改动点严格标记且数量极少，同步官方上游代码仅需 3 步：
 
-### 第 1 步：拉取上游最新分支
+### 第 1 步：配置并拉取官方最新代码
 ```bash
-git fetch upstream
+# 确认上游远程源（只需添加一次）
+git remote add upstream https://github.com/fathah/hermes-desktop.git
+
+# 获取上游最新分支代码
+git fetch upstream main
 ```
 
-### 第 2 步：合并上游更新到当前分支
+### 第 2 步：合并上游更新
 ```bash
 git merge upstream/main
 ```
 
-### 第 3 步：处理极罕见的合并冲突
-因为我们的业务代码全在独立的 `phone/` 目录中，官方改动绝对不会触碰 `phone/`。
-如果出现冲突，**99.9% 仅会发生在上述 2 个挂载点文件**（例如官方在 `start.ts` 或 `Layout.tsx` 附近行增加了新代码）：
-1. 打开有冲突的文件，在冲突标记区**保留我们的 `// [Phone Extension Mount]` 代码块**。
-2. 保存并提交：
+### 第 3 步：若遇到极少数冲突如何处理？
+由于我们的业务逻辑全部存放在 `phone/` 目录中，`git merge` 不会对 `phone/` 产生任何冲突。
+如果 `Layout.tsx` 或 `start.ts` 有行号偏移冲突：
+1. 搜索 `// [Phone Extension Mount Start]` 标记。
+2. 保留原有的引入与挂载点。
+3. 重新构建并验证：
 ```bash
-git add .
-git commit -m "chore: merge upstream changes and keep phone extension mounts"
+npm run build
 ```
-
-### 第 4 步：同时推送到 GitHub 和 Gitee
-```bash
-git push origin main
-```
-本项目已配置双推源（Dual-Remote），执行一次 push 即可自动同步更新至 GitHub 与 Gitee 两个开源平台！
 
 ---
 
-## 4. 如何添加自定义手机自动化技能？
+## 4. 手机模块开发者入口
 
-开发者如需增加新的手机控制功能，只需修改 `phone/` 目录：
-1. **添加 API 调用**：在 `phone/api/gateway-client.ts` 增加对应方法（例如 `GatewayClient.executeSkill(deviceId, "my.skill", params)`）。
-2. **添加界面交互**：在 `phone/components/ControlPad.tsx` 增加按钮或表单。
-3. **完成！** 无需改动任何上游官方代码。
+手机相关的全部研发工作只需关注 `phone/` 目录：
+- `phone/views/PhoneLayout.tsx`：手机模块侧边栏与应用路由
+- `phone/views/PhoneWorkspace.tsx`：设备网格、投屏视窗与右侧日志
+- `phone/components/ScreenViewer.tsx`：WebRTC 实时画面与鼠标物理映射
+- `phone/api/gateway-client.ts`：设备控制与动作 API
