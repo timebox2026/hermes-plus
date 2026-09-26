@@ -21,10 +21,6 @@ import { showChatContextMenu } from "./context-menu";
 import { buildMenu } from "./menu";
 import { setupUpdater } from "./updater";
 
-// [Phone Extension Mount Start]
-import { initPhoneMain } from "../../../phone/main/ipc";
-// [Phone Extension Mount End]
-
 const APP_NAME = process.env.HERMES_DESKTOP_APP_NAME?.trim() || "Hermes Plus";
 const OPEN_DEVTOOLS_ON_START =
   process.env.HERMES_OPEN_DEVTOOLS === "1" ||
@@ -50,10 +46,6 @@ export function startMainProcess(): void {
     notifyCustomProvidersChanged,
     openExternalUrl,
   });
-
-  // [Phone Extension Mount Start]
-  initPhoneMain();
-  // [Phone Extension Mount End]
 
   setupUpdater({ getMainWindow: () => mainWindow });
 

@@ -10,10 +10,9 @@ import {
   Settings,
   PanelLeftClose,
   PanelLeftOpen,
+  Inbox,
 } from "lucide-react";
 import { SuiteSwitcher } from "../components/SuiteSwitcher";
-import { PhoneWorkspace } from "./PhoneWorkspace";
-import { SettingsModal } from "../components/SettingsModal";
 import "./PhoneLayout.css";
 
 interface PhoneLayoutProps {
@@ -22,7 +21,49 @@ interface PhoneLayoutProps {
   toggleSidebar?: () => void;
 }
 
-type PhoneNavView = "my-phones" | "omni-inbox" | "social-media" | "cross-border";
+type PhoneNavView =
+  | "new-work"
+  | "my-phones"
+  | "omni-inbox"
+  | "social-media"
+  | "cross-border"
+  | "settings";
+
+const NAV_DETAILS: Record<
+  PhoneNavView,
+  { title: string; subtitle: string; icon: React.ElementType }
+> = {
+  "new-work": {
+    title: "新工作",
+    subtitle: "暂无正在创建的任务",
+    icon: Plus,
+  },
+  "my-phones": {
+    title: "我的手机",
+    subtitle: "暂无在线手机设备",
+    icon: Smartphone,
+  },
+  "omni-inbox": {
+    title: "消息值守",
+    subtitle: "暂无托管中的消息会话",
+    icon: Layers,
+  },
+  "social-media": {
+    title: "社媒运营",
+    subtitle: "暂无社媒矩阵任务",
+    icon: MessageSquare,
+  },
+  "cross-border": {
+    title: "跨境电商",
+    subtitle: "暂无跨境运营计划",
+    icon: Globe,
+  },
+  settings: {
+    title: "设置",
+    subtitle: "系统与网关配置",
+    icon: Settings,
+  },
+};
 
 export const PhoneLayout: React.FC<PhoneLayoutProps> = ({
   onSuiteChange,
@@ -31,7 +72,9 @@ export const PhoneLayout: React.FC<PhoneLayoutProps> = ({
 }) => {
   const [activeNav, setActiveNav] = useState<PhoneNavView>("my-phones");
   const [appsOpen, setAppsOpen] = useState(true);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+
+  const currentDetail = NAV_DETAILS[activeNav];
+  const CurrentIcon = currentDetail.icon;
 
   return (
     <div className={`phone-layout-shell ${sidebarCollapsed ? "collapsed" : ""}`}>
@@ -40,7 +83,7 @@ export const PhoneLayout: React.FC<PhoneLayoutProps> = ({
         {/* 顶部标题与折叠按钮 */}
         <div className="phone-sidebar-header">
           <div className="phone-sidebar-brand">
-            <span className="phone-sidebar-brand-title">Hermes+ 手机端</span>
+            <span className="phone-sidebar-brand-title">Hermes 手机端</span>
           </div>
           {toggleSidebar && (
             <button
@@ -66,9 +109,9 @@ export const PhoneLayout: React.FC<PhoneLayoutProps> = ({
           {/* + 新工作 按钮 */}
           <button
             type="button"
-            className="phone-new-work-btn"
-            onClick={() => setIsNewWorkModalOpen(true)}
-            title="新建手机任务"
+            className={`phone-new-work-btn ${activeNav === "new-work" ? "active" : ""}`}
+            onClick={() => setActiveNav("new-work")}
+            title="新工作"
           >
             <Plus size={16} strokeWidth={2.5} />
             {!sidebarCollapsed && <span>新工作</span>}
@@ -140,57 +183,28 @@ export const PhoneLayout: React.FC<PhoneLayoutProps> = ({
         <div className="phone-sidebar-footer">
           <button
             type="button"
-            className="phone-nav-item phone-footer-btn"
-            onClick={() => setIsSettingsOpen(true)}
-            title="网关与设备设置"
+            className={`phone-nav-item phone-footer-btn ${activeNav === "settings" ? "active" : ""}`}
+            onClick={() => setActiveNav("settings")}
+            title="设置"
           >
             <Settings size={16} />
-            {!sidebarCollapsed && <span>网关设置</span>}
+            {!sidebarCollapsed && <span>设置</span>}
           </button>
         </div>
       </aside>
 
-      {/* 右侧主工作区 */}
+      {/* 右侧对应空内容展示 */}
       <main className="phone-main-container">
-        {activeNav === "my-phones" && <PhoneWorkspace />}
-
-        {activeNav === "omni-inbox" && (
-          <div className="phone-placeholder-view">
-            <div className="phone-placeholder-card">
-              <Layers size={40} className="phone-placeholder-icon text-sky-500" />
-              <h3>消息值守 (Omni-Inbox)</h3>
-              <p>跨多设备监控微信、企业微信等即时通讯，AI 自动化接管回复与告警通知。</p>
+        <div className="phone-empty-state">
+          <div className="phone-empty-box">
+            <div className="phone-empty-icon-wrap">
+              <CurrentIcon size={32} strokeWidth={1.75} />
             </div>
+            <h2 className="phone-empty-title">{currentDetail.title}</h2>
+            <p className="phone-empty-subtitle">{currentDetail.subtitle}</p>
           </div>
-        )}
-
-        {activeNav === "social-media" && (
-          <div className="phone-placeholder-view">
-            <div className="phone-placeholder-card">
-              <MessageSquare size={40} className="phone-placeholder-icon text-emerald-500" />
-              <h3>社媒运营 (Social Matrix)</h3>
-              <p>支持小红书、抖音、TikTok 多机矩阵自动发图文、点赞互评与引流获客。</p>
-            </div>
-          </div>
-        )}
-
-        {activeNav === "cross-border" && (
-          <div className="phone-placeholder-view">
-            <div className="phone-placeholder-card">
-              <Globe size={40} className="phone-placeholder-icon text-indigo-500" />
-              <h3>跨境电商 (Cross-Border Ops)</h3>
-              <p>海外电商平台（Shopee, Amazon, TikTok Shop）物理机自动巡检与上架。</p>
-            </div>
-          </div>
-        )}
+        </div>
       </main>
-
-      {/* 设置弹窗 */}
-      <SettingsModal
-        isOpen={isSettingsOpen}
-        onClose={() => setIsSettingsOpen(false)}
-        onConfigSaved={() => {}}
-      />
     </div>
   );
 };

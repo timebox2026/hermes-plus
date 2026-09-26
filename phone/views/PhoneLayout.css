@@ -69,7 +69,7 @@
   gap: 4px;
 }
 
-/* + 新工作 按钮 (与截图中一致的药丸底色与样式) */
+/* + 新工作 按钮 (药丸底色与样式) */
 .phone-new-work-btn {
   display: flex;
   align-items: center;
@@ -94,8 +94,9 @@
   transform: translateY(-0.5px);
 }
 
-.phone-new-work-btn:active {
-  transform: translateY(0.5px);
+.phone-new-work-btn.active {
+  background-color: rgba(59, 130, 246, 0.24);
+  box-shadow: 0 0 0 1px rgba(59, 130, 246, 0.3);
 }
 
 /* 普通导航项 */
@@ -176,7 +177,7 @@
   color: var(--text-muted, #71717a);
 }
 
-/* 右侧主工作区容器 */
+/* 右侧主工作区容器：居中展示极简空状态 */
 .phone-main-container {
   flex: 1;
   height: 100%;
@@ -185,39 +186,45 @@
   background-color: var(--bg-primary, #ffffff);
 }
 
-/* 占位页面卡片 */
-.phone-placeholder-view {
+.phone-empty-state {
+  width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: 32px;
-  background: var(--bg-primary, #ffffff);
 }
 
-.phone-placeholder-card {
-  max-width: 420px;
-  text-align: center;
+.phone-empty-box {
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  color: var(--text-muted, #71717a);
+  user-select: none;
 }
 
-.phone-placeholder-icon {
-  margin-bottom: 8px;
+.phone-empty-icon-wrap {
+  width: 64px;
+  height: 64px;
+  border-radius: 16px;
+  background-color: var(--bg-tertiary, rgba(0, 0, 0, 0.04));
+  border: 1px dashed var(--border, #e4e4e7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted, #71717a);
+  margin-bottom: 4px;
 }
 
-.phone-placeholder-card h3 {
-  font-size: 18px;
+.phone-empty-title {
+  font-size: 16px;
   font-weight: 600;
-  margin: 0;
   color: var(--text-primary, #18181b);
+  margin: 0;
 }
 
-.phone-placeholder-card p {
-  font-size: 13.5px;
-  line-height: 1.6;
+.phone-empty-subtitle {
+  font-size: 13px;
   color: var(--text-muted, #71717a);
   margin: 0;
 }
