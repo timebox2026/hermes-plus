@@ -35,14 +35,13 @@ hermes-plus/
 
 ## 2. 上游核心代码精确改动清单 (Exact Diffs)
 
-我们在上游源码中仅改动了以下 1 个业务文件：
+我们在上游源码中仅改动了以下几个文件（完全带有清晰的标识，方便上游同步）：
 
-### 改动：界面顶部 Tabs 与手机视图挂载 (`src/renderer/src/screens/Layout/Layout.tsx`)
+### 改动 1：界面顶部 Tabs 与手机视图挂载 (`src/renderer/src/screens/Layout/Layout.tsx`)
 - **改动目的**：
   1. 在侧边栏最顶部挂载 `SuiteSwitcher`（`[ 💻 电脑 ] [ 📱 手机 ]` 药丸胶囊选项卡）。
   2. 根据 `activeSuite` 在内部平滑切流：手机模式挂载 `PhoneSidebarNav` 与 `PhoneMainView`，共享原生侧边栏框架与主题样式。
-- **改动位置与代码**：
-
+- **改动代码**：
 ```diff
 + // [Phone Extension Mount Start]
 + import { SuiteSwitcher } from "../../../../../phone/components/SuiteSwitcher";
@@ -107,6 +106,48 @@ hermes-plus/
 
 ---
 
+### 改动 2：放行远程 HTTP 网关 CSP (`src/renderer/index.html` & `src/main/app/start.ts`)
+- **改动目的**：
+  上游默认 CSP 仅放行了本地回环地址（`http://127.0.0.1:*` 与 `http://localhost:*`），对外部连接仅允许 `https:`。为了支持开发者在局域网内或公网测试服务器直连运行中的 Java/Python HTTP 网关（例如 `http://bk.shiguangxiazi.com:58166`），需要在安全策略中增加对 `http:` 的支持。
+- **改动位置与代码**：
+
+1. **渲染进程开发模板** (`src/renderer/index.html` 第 8 行)：
+```diff
+  <meta
+    http-equiv="Content-Security-Policy"
+-   content="default-src 'self'; ... img-src 'self' data: blob: file: https:; ... connect-src 'self' blob: http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* https://*.hermesone.org wss:; ..."
++   content="default-src 'self'; ... img-src 'self' data: blob: file: https: http:; ... connect-src 'self' blob: http: http://127.0.0.1:* http://localhost:* ws://127.0.0.1:* ws://localhost:* https: https://*.hermesone.org wss:; ..."
+  />
+```
+
+2. **主进程生产安全响应头** (`src/main/app/start.ts` 第 80~82 行)：
+```diff
+-   "img-src 'self' data: blob: file: https:; " +
+-   "media-src 'self' data: blob: file: https:; " +
+-   "connect-src 'self' blob: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https: wss:; " +
++   "img-src 'self' data: blob: file: https: http:; " +
++   "media-src 'self' data: blob: file: https:; " +
++   "connect-src 'self' blob: http: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https: wss:; " +
+```
+
+> **注意**：修改后已通过官方单元测试 [`tests/dashboard-csp.test.ts`](file:///Volumes/WORK/Projects/langhua/aibot/upper/hermes-plus/tests/dashboard-csp.test.ts)，完全保障原有安全性并兼容上游标准测试套件。
+
+---
+
+### 改动 3：TypeScript 包含路径 (`tsconfig.web.json`)
+- **改动目的**：
+  将独立目录 `phone` 添加到前端 TypeScript 编译与类型检查范围中，确保 `npm run build` 和编辑器自动补全正常。
+```diff
+  "include": [
+    "src/renderer/src/**/*",
++   "phone/**/*",
+    "src/preload/*.d.ts",
+    "src/shared/**/*"
+  ]
+```
+
+---
+
 ## 3. 当官方上游发新版时，如何同步更新？
 
 ```bash
@@ -116,6 +157,6 @@ git fetch upstream main
 # 2. 合并上游更新
 git merge upstream/main
 
-# 3. 若 Layout.tsx 有行号偏移，按 // [Phone Extension Mount] 注释确认保留即可
+# 3. 若 Layout.tsx 或 start.ts 有行号偏移，按本文档中的 Exact Diffs 对照保留即可
 npm run build
 ```
