@@ -19,7 +19,7 @@ export function BindingModal({
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [boundSuccess, setBoundSuccess] = useState<boolean>(false);
-  const initialCountRef = useRef<number>(0);
+  const initialDeviceIdsRef = useRef<Set<string>>(new Set());
 
   const fetchTicket = async () => {
     setLoading(true);
@@ -27,7 +27,7 @@ export function BindingModal({
     setBoundSuccess(false);
     try {
       const devList = await phoneClient.listDevices().catch(() => []);
-      initialCountRef.current = devList.length;
+      initialDeviceIdsRef.current = new Set(devList.map((d) => d.deviceId));
 
       const res = await phoneClient.createBindingTicket();
       if (res && res.ticket) {
@@ -68,31 +68,42 @@ export function BindingModal({
 
     let active = true;
 
-    // 1. SSE 监听网关事件
+    // 1. SSE 实时监听网关广播事件
     const closeSse = phoneClient.connectSse((event) => {
       if (!active) return;
-      if (
-        (event.type === "DEVICE_BINDING_RESULT" || event.event === "DEVICE_BINDING_RESULT") &&
-        (event.status === "SUCCEEDED" || (event as any).requestId === ticketData.requestId)
-      ) {
+      const isBindingResult =
+        event?.type === "DEVICE_BINDING_RESULT" ||
+        event?.event === "DEVICE_BINDING_RESULT";
+      const isSucceeded =
+        event?.status === "SUCCEEDED" ||
+        event?.requestId === ticketData.requestId ||
+        event?.request_id === ticketData.requestId;
+
+      if (isBindingResult && isSucceeded) {
         setBoundSuccess(true);
         if (onBoundSuccess) onBoundSuccess();
       }
     });
 
-    // 2. 轮询保障
+    // 2. 轮询双重兜底 (每 1.5 秒检查一次设备变化)
     const pollInterval = setInterval(async () => {
       try {
         const devices = await phoneClient.listDevices();
         if (!active) return;
-        if (devices.length > initialCountRef.current) {
+
+        // 条件 A: 发现了初始列表之外的新设备 ID
+        const hasNewDevice = devices.some((d) => !initialDeviceIdsRef.current.has(d.deviceId));
+        // 条件 B: 之前设备数为空，现在有了设备
+        const becameNonEmpty = initialDeviceIdsRef.current.size === 0 && devices.length > 0;
+
+        if (hasNewDevice || becameNonEmpty) {
           setBoundSuccess(true);
           if (onBoundSuccess) onBoundSuccess();
         }
       } catch {
         // ignore
       }
-    }, 2000);
+    }, 1500);
 
     return () => {
       active = false;

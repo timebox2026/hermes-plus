@@ -237,30 +237,74 @@ class PhoneClient {
     return res.data || (res as any);
   }
 
-  // 4. SSE 实时事件流
+  // 4. SSE 实时事件流（使用 fetch 实现以携带 X-AppKey 鉴权头）
   public connectSse(
     onMessage: (event: any) => void,
     onError?: (err: any) => void,
   ): () => void {
     const config = this.getConfig();
-    const url = `${config.gatewayUrl.replace(/\/+$/, "")}/gateway/sse`;
-    const eventSource = new EventSource(url);
+    const cleanUrl = config.gatewayUrl.replace(/\/+$/, "");
+    const url = `${cleanUrl}/gateway/sse`;
+    const controller = new AbortController();
 
-    eventSource.onmessage = (e) => {
+    (async () => {
       try {
-        const data = JSON.parse(e.data);
-        onMessage(data);
-      } catch {
-        onMessage(e.data);
-      }
-    };
+        const headers: Record<string, string> = {
+          Accept: "text/event-stream",
+        };
+        if (config.appKey) {
+          headers["X-AppKey"] = config.appKey;
+        }
 
-    eventSource.onerror = (e) => {
-      if (onError) onError(e);
-    };
+        const res = await fetch(url, {
+          headers,
+          signal: controller.signal,
+        });
+
+        if (!res.ok) {
+          throw new Error(`SSE 连接失败: HTTP ${res.status}`);
+        }
+
+        const reader = res.body?.getReader();
+        if (!reader) throw new Error("无法读取 SSE 数据流");
+
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+
+          buffer += decoder.decode(value, { stream: true });
+          const blocks = buffer.split("\n\n");
+          buffer = blocks.pop() || "";
+
+          for (const block of blocks) {
+            const dataLines = block
+              .split("\n")
+              .filter((line) => line.startsWith("data:"))
+              .map((line) => line.slice(5).trim());
+
+            for (const dataStr of dataLines) {
+              if (!dataStr) continue;
+              try {
+                const json = JSON.parse(dataStr);
+                onMessage(json);
+              } catch {
+                onMessage(dataStr);
+              }
+            }
+          }
+        }
+      } catch (err: any) {
+        if (err.name !== "AbortError" && onError) {
+          onError(err);
+        }
+      }
+    })();
 
     return () => {
-      eventSource.close();
+      controller.abort();
     };
   }
 }
