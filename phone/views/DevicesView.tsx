@@ -6,7 +6,7 @@ import { DeviceCard } from "../components/DeviceCard";
 import { BindingModal } from "../components/BindingModal";
 
 export function DevicesView(): React.JSX.Element {
-  const [devices, setDevices] = useState<DeviceInfo[]>([]);
+  const [devices, setDevices] = useState<DeviceInfo[]>(() => phoneClient.getCachedDevices());
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<"ALL" | "ONLINE" | "OFFLINE">("ALL");
@@ -19,22 +19,32 @@ export function DevicesView(): React.JSX.Element {
     setLoading(true);
     setError(null);
     try {
-      const list = await phoneClient.listDevices();
+      phoneClient.reconnectSse();
+      await new Promise((r) => setTimeout(r, 600));
+      const list = phoneClient.getCachedDevices();
       setDevices(list);
       if (list.length > 0 && !selectedDeviceId) {
         setSelectedDeviceId(list[0].deviceId);
         phoneClient.saveConfig({ selectedDeviceId: list[0].deviceId });
       }
     } catch (err: any) {
-      setError(err?.message || "连接网关失败，请确保本地网关已启动 (58166 端口)");
+      setError(err?.message || "连接网关失败，请确保网关服务正常运行");
     } finally {
       setLoading(false);
     }
   }, [selectedDeviceId]);
 
   useEffect(() => {
-    fetchDevices();
-  }, [fetchDevices]);
+    phoneClient.ensureSseConnected();
+    const unsub = phoneClient.onDevicesChange((updatedList) => {
+      setDevices(updatedList);
+      if (updatedList.length > 0 && !selectedDeviceId) {
+        setSelectedDeviceId(updatedList[0].deviceId);
+        phoneClient.saveConfig({ selectedDeviceId: updatedList[0].deviceId });
+      }
+    });
+    return () => unsub();
+  }, [selectedDeviceId]);
 
   const handleSelect = (device: DeviceInfo) => {
     setSelectedDeviceId(device.deviceId);
