@@ -256,12 +256,14 @@ export function BindingModal({
                       </button>
                     </div>
                   </div>
-                ) : (
+                ) : qrImageUrl ? (
                   <img
                     src={qrImageUrl}
                     alt="绑定二维码"
                     style={{ width: 200, height: 200, objectFit: "contain" }}
                   />
+                ) : (
+                  <RefreshCw size={28} className="animate-spin text-sky-500" />
                 )}
               </div>
 
