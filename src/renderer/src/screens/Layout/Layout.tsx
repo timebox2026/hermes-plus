@@ -903,7 +903,7 @@ function Layout({
         <main className="content">
           {activeSuite === "phone" ? (
             /* [Phone Extension Mount Start] */
-            <PhoneMainView activeNav={activePhoneNav} />
+            <PhoneMainView activeNav={activePhoneNav} onNavigate={setActivePhoneNav} />
             /* [Phone Extension Mount End] */
           ) : (
             <>

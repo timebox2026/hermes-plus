@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { X, QrCode, RefreshCw, CheckCircle2 } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
+import type { BindingTicketResponse } from "../sdk/types";
 
 interface BindingModalProps {
   isOpen: boolean;
@@ -13,24 +14,30 @@ export function BindingModal({
   onClose,
   onBoundSuccess,
 }: BindingModalProps): React.JSX.Element | null {
-  const [ticket, setTicket] = useState<string>("");
+  const [ticketData, setTicketData] = useState<BindingTicketResponse | null>(null);
   const [countdown, setCountdown] = useState<number>(180);
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [boundSuccess, setBoundSuccess] = useState<boolean>(false);
+  const initialCountRef = useRef<number>(0);
 
   const fetchTicket = async () => {
     setLoading(true);
     setError(null);
+    setBoundSuccess(false);
     try {
+      const devList = await phoneClient.listDevices().catch(() => []);
+      initialCountRef.current = devList.length;
+
       const res = await phoneClient.createBindingTicket();
       if (res && res.ticket) {
-        setTicket(res.ticket);
+        setTicketData(res);
         setCountdown(res.expiresInSeconds || 180);
       } else {
         throw new Error("返回的数据中无有效 ticket");
       }
     } catch (err: any) {
-      setError(err?.message || "获取绑定票据失败，请确认网关是否正常启动");
+      setError(err?.message || "获取绑定票据失败，请确认网关是否正常启动且 AppKey 有效");
     } finally {
       setLoading(false);
     }
@@ -40,24 +47,75 @@ export function BindingModal({
     if (isOpen) {
       fetchTicket();
     } else {
-      setTicket("");
+      setTicketData(null);
       setCountdown(0);
+      setBoundSuccess(false);
     }
   }, [isOpen]);
 
+  // 倒计时
   useEffect(() => {
-    if (!isOpen || countdown <= 0) return;
+    if (!isOpen || countdown <= 0 || boundSuccess) return;
     const timer = setInterval(() => {
       setCountdown((c) => (c > 1 ? c - 1 : 0));
     }, 1000);
     return () => clearInterval(timer);
-  }, [isOpen, countdown]);
+  }, [isOpen, countdown, boundSuccess]);
+
+  // 监听绑定成功状态：SSE + 轮询
+  useEffect(() => {
+    if (!isOpen || !ticketData || boundSuccess) return;
+
+    let active = true;
+
+    // 1. SSE 监听网关事件
+    const closeSse = phoneClient.connectSse((event) => {
+      if (!active) return;
+      if (
+        (event.type === "DEVICE_BINDING_RESULT" || event.event === "DEVICE_BINDING_RESULT") &&
+        (event.status === "SUCCEEDED" || (event as any).requestId === ticketData.requestId)
+      ) {
+        setBoundSuccess(true);
+        if (onBoundSuccess) onBoundSuccess();
+      }
+    });
+
+    // 2. 轮询保障
+    const pollInterval = setInterval(async () => {
+      try {
+        const devices = await phoneClient.listDevices();
+        if (!active) return;
+        if (devices.length > initialCountRef.current) {
+          setBoundSuccess(true);
+          if (onBoundSuccess) onBoundSuccess();
+        }
+      } catch {
+        // ignore
+      }
+    }, 2000);
+
+    return () => {
+      active = false;
+      closeSse();
+      clearInterval(pollInterval);
+    };
+  }, [isOpen, ticketData, boundSuccess, onBoundSuccess]);
 
   if (!isOpen) return null;
 
-  // 使用轻量自包含 Canvas 绘制简易二维码或二维码图
-  const qrImageUrl = ticket
-    ? `https://api.qrserver.com/v1/create-qr-code/?size=200x200&margin=10&data=${encodeURIComponent(ticket)}`
+  // 核心：手机端 DeviceBindingScanActivity 严格校验 JSON 格式
+  // { v: 1, type: "BATON_DEVICE_BINDING", requestId: "...", ticket: "..." }
+  const qrPayload = ticketData
+    ? JSON.stringify({
+        v: 1,
+        type: "BATON_DEVICE_BINDING",
+        requestId: ticketData.requestId,
+        ticket: ticketData.ticket,
+      })
+    : "";
+
+  const qrImageUrl = qrPayload
+    ? `https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=${encodeURIComponent(qrPayload)}`
     : "";
 
   return (
@@ -128,93 +186,110 @@ export function BindingModal({
             textAlign: "center",
           }}
         >
-          <p style={{ fontSize: 13, color: "var(--text-muted, #888)", margin: "0 0 16px 0" }}>
-            请使用浪花 AI 手机打开“扫一扫”，扫描下方二维码完成真机绑定
-          </p>
+          {boundSuccess ? (
+            <div style={{ padding: "24px 0", display: "flex", flexDirection: "column", alignItems: "center", gap: 12 }}>
+              <CheckCircle2 size={52} color="#16a34a" />
+              <div style={{ fontSize: 17, fontWeight: 700, color: "#16a34a" }}>真机绑定成功！</div>
+              <p style={{ fontSize: 13, color: "var(--text-muted, #71717a)", margin: 0, maxWidth: 300, lineHeight: 1.5 }}>
+                手机终端已连通当前上位机，设备列表已同步更新。
+              </p>
+            </div>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: "var(--text-muted, #888)", margin: "0 0 16px 0" }}>
+                请使用浪花 AI 手机打开“扫一扫”，扫描下方二维码完成真机绑定
+              </p>
 
-          <div
-            style={{
-              width: 210,
-              height: 210,
-              backgroundColor: "#ffffff",
-              borderRadius: 12,
-              border: "1px solid #e5e5e5",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              position: "relative",
-              overflow: "hidden",
-            }}
-          >
-            {loading ? (
-              <RefreshCw size={28} className="animate-spin text-sky-500" />
-            ) : error ? (
-              <div style={{ padding: 12, fontSize: 12, color: "#ef4444" }}>
-                {error}
-                <div style={{ marginTop: 8 }}>
-                  <button
-                    type="button"
-                    onClick={fetchTicket}
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      background: "var(--bg-tertiary)",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    重试
-                  </button>
-                </div>
-              </div>
-            ) : countdown <= 0 ? (
-              <div style={{ padding: 12, fontSize: 12, color: "var(--text-muted)" }}>
-                二维码已过期
-                <div style={{ marginTop: 8 }}>
-                  <button
-                    type="button"
-                    onClick={fetchTicket}
-                    style={{
-                      padding: "4px 10px",
-                      borderRadius: 6,
-                      fontSize: 12,
-                      background: "var(--bg-tertiary)",
-                      border: "none",
-                      cursor: "pointer",
-                    }}
-                  >
-                    刷新二维码
-                  </button>
-                </div>
-              </div>
-            ) : (
-              <img
-                src={qrImageUrl}
-                alt="绑定二维码"
-                style={{ width: 190, height: 190, objectFit: "contain" }}
-              />
-            )}
-          </div>
-
-          {ticket && countdown > 0 && (
-            <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-muted)" }}>
-              <span>有效时间剩余：</span>
-              <strong style={{ color: "#2563eb" }}>{countdown} 秒</strong>
               <div
                 style={{
-                  marginTop: 6,
-                  fontFamily: "monospace",
-                  fontSize: 11,
-                  background: "var(--bg-tertiary, rgba(0,0,0,0.04))",
-                  padding: "4px 8px",
-                  borderRadius: 6,
-                  userSelect: "all",
+                  width: 220,
+                  height: 220,
+                  backgroundColor: "#ffffff",
+                  borderRadius: 12,
+                  border: "1px solid #e5e5e5",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  position: "relative",
+                  overflow: "hidden",
                 }}
               >
-                Ticket: {ticket}
+                {loading ? (
+                  <RefreshCw size={28} className="animate-spin text-sky-500" />
+                ) : error ? (
+                  <div style={{ padding: 12, fontSize: 12, color: "#ef4444" }}>
+                    {error}
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        type="button"
+                        onClick={fetchTicket}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          fontSize: 12,
+                          background: "var(--bg-tertiary)",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        重试
+                      </button>
+                    </div>
+                  </div>
+                ) : countdown <= 0 ? (
+                  <div style={{ padding: 12, fontSize: 12, color: "var(--text-muted)" }}>
+                    二维码已过期
+                    <div style={{ marginTop: 8 }}>
+                      <button
+                        type="button"
+                        onClick={fetchTicket}
+                        style={{
+                          padding: "4px 10px",
+                          borderRadius: 6,
+                          fontSize: 12,
+                          background: "var(--bg-tertiary)",
+                          border: "none",
+                          cursor: "pointer",
+                        }}
+                      >
+                        刷新二维码
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <img
+                    src={qrImageUrl}
+                    alt="绑定二维码"
+                    style={{ width: 200, height: 200, objectFit: "contain" }}
+                  />
+                )}
               </div>
-            </div>
+
+              {ticketData && countdown > 0 && (
+                <div style={{ marginTop: 14, fontSize: 12, color: "var(--text-muted)" }}>
+                  <span>有效时间剩余：</span>
+                  <strong style={{ color: "#2563eb" }}>{countdown} 秒</strong>
+                  <div
+                    style={{
+                      marginTop: 6,
+                      fontFamily: "monospace",
+                      fontSize: 11,
+                      background: "var(--bg-tertiary, rgba(0,0,0,0.04))",
+                      padding: "4px 8px",
+                      borderRadius: 6,
+                      userSelect: "all",
+                      maxWidth: 340,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      whiteSpace: "nowrap",
+                    }}
+                    title={ticketData.ticket}
+                  >
+                    Ticket: {ticketData.ticket}
+                  </div>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -232,16 +307,17 @@ export function BindingModal({
             type="button"
             onClick={onClose}
             style={{
-              padding: "6px 16px",
+              padding: "6px 18px",
               borderRadius: 8,
-              border: "1px solid var(--border, #e5e5e5)",
-              backgroundColor: "var(--bg-primary, #ffffff)",
-              color: "var(--text-primary, #111)",
+              border: boundSuccess ? "none" : "1px solid var(--border, #e5e5e5)",
+              backgroundColor: boundSuccess ? "#16a34a" : "var(--bg-primary, #ffffff)",
+              color: boundSuccess ? "#ffffff" : "var(--text-primary, #111)",
               fontSize: 13,
+              fontWeight: 600,
               cursor: "pointer",
             }}
           >
-            完成
+            {boundSuccess ? "完成" : "关闭"}
           </button>
         </div>
       </div>
