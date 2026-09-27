@@ -59,7 +59,16 @@ export function GatewayView(): React.JSX.Element {
       setIsConnected(true);
     } catch (err: any) {
       addLog(`❌ 网关连接失败: ${err?.message || "网络不可达，请检查网关是否已启动"}`, "error");
-      addLog("💡 提示：请先在下方填写正确的 Gateway URL 和 AppKey，然后点击保存。", "warn");
+      const url = config.gatewayUrl.toLowerCase();
+      const isRemoteHttp = url.startsWith("http://") && !url.includes("localhost") && !url.includes("127.0.0.1");
+      if (isRemoteHttp) {
+        addLog("🛡️ 检测到非本机的 HTTP 远端地址，若触发 CSP 拦截：", "warn");
+        addLog("   建议 1：在远程服务器配置 HTTPS 证书，使用 https:// 连接", "info");
+        addLog("   建议 2：使用 SSH 隧道映射到本地：ssh -L 58166:localhost:58166 user@host", "info");
+        addLog("          然后填入 http://localhost:58166 无缝连接！", "success");
+      } else {
+        addLog("💡 提示：请确认网关服务是否已启动，以及下方填写的 Gateway URL 和 AppKey 是否正确。", "warn");
+      }
       setIsConnected(false);
     } finally {
       setBusy(false);
