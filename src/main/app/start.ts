@@ -77,9 +77,9 @@ export function startMainProcess(): void {
           "default-src 'self'; " +
             "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; " +
             "style-src 'self' 'unsafe-inline'; " +
-            "img-src 'self' data: blob: file: https: http:; " +
+            "img-src 'self' data: blob: file: https:; " +
             "media-src 'self' data: blob: file: https:; " +
-            "connect-src 'self' blob: http: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https: wss:; " +
+            "connect-src 'self' blob: http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:* https: wss:; " +
             "font-src 'self' data:; " +
             "frame-src 'self' https: http://127.0.0.1:* http://localhost:*; " +
             "object-src 'none'; " +
