@@ -5,6 +5,7 @@ import type {
   ScreenshotResponse,
   BindingTicketResponse,
   ApiLogEntry,
+  InstalledAppInfo,
 } from "./types";
 
 const STORAGE_GATEWAY_URL_KEY = "hermes.phone.gatewayUrl";
@@ -15,13 +16,22 @@ const STORAGE_CACHED_DEVICES_KEY = "hermes.phone.cachedDevices";
 type LogListener = (entry: ApiLogEntry) => void;
 type DeviceListener = (devices: DeviceInfo[]) => void;
 type BindingResultListener = (result: { status: string; requestId?: string; deviceId?: string }) => void;
+type SseEventListener = (event: any) => void;
 
 class PhoneClient {
   private logListeners: Set<LogListener> = new Set();
   private deviceListeners: Set<DeviceListener> = new Set();
   private bindingListeners: Set<BindingResultListener> = new Set();
+  private sseListeners: Set<SseEventListener> = new Set();
   private devices: DeviceInfo[] = [];
   private sseAbortController: AbortController | null = null;
+  /**
+   * AppKey 校验状态：
+   *   null  = 未验证（首次启动或 appKey 变更后）
+   *   true  = 平台鉴权通过（HTTP 200）
+   *   false = 明确鉴权失败（HTTP 401 / 403，或业务层拒绝）
+   */
+  private credentialValid: boolean | null = null;
 
   constructor() {
     try {
@@ -55,6 +65,12 @@ class PhoneClient {
     return () => this.bindingListeners.delete(listener);
   }
 
+  public onSseEvent(listener: SseEventListener): () => void {
+    this.sseListeners.add(listener);
+    this.ensureSseConnected();
+    return () => this.sseListeners.delete(listener);
+  }
+
   private notifyDevices(devices: DeviceInfo[]) {
     this.devices = devices;
     try {
@@ -71,6 +87,15 @@ class PhoneClient {
 
   public handleSseMessage(event: any) {
     if (!event || typeof event !== "object") return;
+
+    // 0. 全量实时派发给所有外部监听器 (如 EventStreamDemo)
+    this.sseListeners.forEach((l) => {
+      try {
+        l(event);
+      } catch (err) {
+        console.error("SSE listener dispatch error:", err);
+      }
+    });
 
     // 1. 处理设备全量列表推送
     if (event.type === "DEVICE_LIST_SYNC" && Array.isArray(event.devices)) {
@@ -154,38 +179,54 @@ class PhoneClient {
 
         while (true) {
           const { done, value } = await reader.read();
-          if (done) break;
+          if (done) {
+            console.warn("[PhoneClient] SSE 数据流读取结束 (done=true)");
+            break;
+          }
 
           buffer += decoder.decode(value, { stream: true });
-          const blocks = buffer.split("\n\n");
+          // 统一换行符 (CRLF -> LF, CR -> LF)，防止 Spring SseEmitter 的 \r\n\r\n 无法匹配
+          const normalized = buffer.replace(/\r\n/g, "\n").replace(/\r/g, "\n");
+          const blocks = normalized.split("\n\n");
           buffer = blocks.pop() || "";
 
           for (const block of blocks) {
-            const dataLines = block
-              .split("\n")
-              .filter((line) => line.startsWith("data:"))
-              .map((line) => line.slice(5).trim());
-
-            for (const dataStr of dataLines) {
-              if (!dataStr) continue;
-              try {
-                const json = JSON.parse(dataStr);
-                this.handleSseMessage(json);
-              } catch {
-                // ignore
+            if (!block.trim()) continue;
+            const lines = block.split("\n");
+            const dataLines: string[] = [];
+            for (const line of lines) {
+              const trimmed = line.trim();
+              if (trimmed.startsWith("data:")) {
+                dataLines.push(trimmed.slice(5).trim());
               }
+            }
+            if (dataLines.length === 0) continue;
+            const dataStr = dataLines.join("\n");
+            if (!dataStr) continue;
+
+            try {
+              const json = JSON.parse(dataStr);
+              this.handleSseMessage(json);
+            } catch {
+              // 纯文本推送
+              this.handleSseMessage({ type: "RAW_EVENT", content: dataStr });
             }
           }
         }
       } catch (err: any) {
         if (err.name !== "AbortError") {
-          console.warn("[PhoneClient] SSE 流异常中断，3秒后重试:", err?.message);
+          console.warn("[PhoneClient] SSE 流异常中断:", err?.message);
+        }
+      } finally {
+        // 关键自愈：只要不是由于本地手动调用 abort() 取消的，重置控制器并自愈重连
+        if (!controller.signal.aborted) {
+          if (this.sseAbortController === controller) {
+            this.sseAbortController = null;
+          }
           setTimeout(() => {
-            if (this.sseAbortController === controller) {
-              this.sseAbortController = null;
-              this.ensureSseConnected();
-            }
-          }, 3000);
+            console.log("[PhoneClient] SSE 自动恢复重连...");
+            this.ensureSseConnected();
+          }, 2000);
         }
       }
     })();
@@ -201,17 +242,25 @@ class PhoneClient {
 
   public getConfig(): GatewayConfig {
     try {
+      let savedUrl = (localStorage.getItem(STORAGE_GATEWAY_URL_KEY) || "").trim();
+      // 自动清洗与升级旧测试地址与协议错误
+      if (!savedUrl || savedUrl.includes("bk.shiguangxiazi.com")) {
+        savedUrl = "https://api6.beikke.com/aibot/v1";
+        localStorage.setItem(STORAGE_GATEWAY_URL_KEY, savedUrl);
+      } else if (savedUrl.startsWith("http://api6.beikke.com")) {
+        savedUrl = savedUrl.replace(/^http:\/\//, "https://").replace(/\/+$/, "");
+        localStorage.setItem(STORAGE_GATEWAY_URL_KEY, savedUrl);
+      }
+
       return {
-        gatewayUrl:
-          localStorage.getItem(STORAGE_GATEWAY_URL_KEY) ||
-          "http://localhost:58166",
-        appKey: localStorage.getItem(STORAGE_APP_KEY) || "",
+        gatewayUrl: savedUrl,
+        appKey: (localStorage.getItem(STORAGE_APP_KEY) || "").trim(),
         selectedDeviceId:
           localStorage.getItem(STORAGE_SELECTED_DEVICE_KEY) || undefined,
       };
     } catch {
       return {
-        gatewayUrl: "http://localhost:58166",
+        gatewayUrl: "https://api6.beikke.com/aibot/v1",
         appKey: "",
       };
     }
@@ -220,10 +269,19 @@ class PhoneClient {
   public saveConfig(config: Partial<GatewayConfig>): void {
     try {
       if (config.gatewayUrl !== undefined) {
-        localStorage.setItem(STORAGE_GATEWAY_URL_KEY, config.gatewayUrl);
+        let cleanUrl = config.gatewayUrl.trim().replace(/\/+$/, "");
+        if (cleanUrl.startsWith("http://api6.beikke.com") || cleanUrl.startsWith("http://bot.beikke.com")) {
+          cleanUrl = cleanUrl.replace(/^http:\/\//, "https://");
+        }
+        localStorage.setItem(STORAGE_GATEWAY_URL_KEY, cleanUrl);
       }
       if (config.appKey !== undefined) {
-        localStorage.setItem(STORAGE_APP_KEY, config.appKey);
+        const cleanKey = config.appKey.trim();
+        // AppKey 变更时重置校验状态，强制重新验证
+        if (cleanKey !== localStorage.getItem(STORAGE_APP_KEY)) {
+          this.credentialValid = null;
+        }
+        localStorage.setItem(STORAGE_APP_KEY, cleanKey);
       }
       if (config.selectedDeviceId !== undefined) {
         localStorage.setItem(
@@ -236,6 +294,11 @@ class PhoneClient {
     }
     // 配置变动时自动重连 SSE
     this.reconnectSse();
+  }
+
+  /** 供外部组件读取当前校验状态（null=未校验，true=有效，false=无效） */
+  public getCredentialValid(): boolean | null {
+    return this.credentialValid;
   }
 
   public onLog(listener: LogListener): () => void {
@@ -300,20 +363,50 @@ class PhoneClient {
     }
   }
 
-  // 1. 鉴权与网关检测
-  public async authMachine(machineCode: string = "DEV-TEST-001"): Promise<string> {
-    const res = await this.fetchWithLog<{ code: number; data: { appKey: string } }>(
-      "/auth/machine",
-      {
-        method: "POST",
-        body: JSON.stringify({ machineCode }),
-      },
-    );
-    if (res.data?.appKey) {
-      this.saveConfig({ appKey: res.data.appKey });
-      return res.data.appKey;
+  // 1. 凭据校验与鉴权探活（由开发者在开放平台自主获取并录入）
+  public async validateCredential(appKeyToTest?: string): Promise<{ valid: boolean; message: string }> {
+    const config = this.getConfig();
+    const key = (appKeyToTest ?? config.appKey).trim();
+    if (!key) {
+      this.credentialValid = false;
+      return { valid: false, message: "未配置 AppKey，请前往浪花开放平台获取凭证" };
     }
-    throw new Error("未能获取到有效 AppKey");
+
+    const cleanUrl = config.gatewayUrl.replace(/\/+$/, "");
+    try {
+      const res = await fetch(`${cleanUrl}/gateway/device-binding/ticket`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "X-AppKey": key,
+        },
+      });
+
+      if (res.status === 401) {
+        this.credentialValid = false;
+        return { valid: false, message: "鉴权失败：缺少 X-AppKey 或网关未识别请求头" };
+      }
+      if (res.status === 403) {
+        this.credentialValid = false;
+        return { valid: false, message: "鉴权失败：AppKey 无效或已被后台停用，请核对凭证" };
+      }
+      if (!res.ok) {
+        // 非 401/403 的网络错误：不锁定（可能是网关临时故障），保持 null
+        return { valid: false, message: `网关校验返回异常: HTTP ${res.status}` };
+      }
+
+      const data = await res.json().catch(() => null);
+      if (data && (data.code === 200 || data.ticket)) {
+        this.credentialValid = true;
+        return { valid: true, message: "凭证校验成功，开发者身份已通过网关认证" };
+      }
+      // 业务层拒绝（code !== 200）：明确标记为无效
+      this.credentialValid = false;
+      return { valid: false, message: data?.msg || data?.message || "AppKey 校验未通过" };
+    } catch (err: any) {
+      // 网络不可达：不修改 credentialValid（网关可能暂时宕机，不应误杀已有凭证）
+      return { valid: false, message: `无法连接到网关服务 (${err?.message || "网络不可达"})` };
+    }
   }
 
   // 2. 设备管理 (优先通过 SSE 同步流，保持与网关设计一致)
@@ -323,6 +416,13 @@ class PhoneClient {
   }
 
   public async createBindingTicket(): Promise<BindingTicketResponse> {
+    const config = this.getConfig();
+    if (!config.appKey || !config.appKey.trim()) {
+      throw new Error("请先在【开发者设置】中录入由平台下发的有效 AppKey 凭据");
+    }
+    if (this.credentialValid === false) {
+      throw new Error("AppKey 凭据校验未通过（401/403），扫码绑定已被阻断，请在【开发者设置】中更新有效凭据");
+    }
     const res = await this.fetchWithLog<{ code: number; data: BindingTicketResponse }>(
       "/gateway/device-binding/ticket",
       { method: "POST" },
@@ -336,6 +436,14 @@ class PhoneClient {
     skillId: string,
     params: Record<string, any> = {},
   ): Promise<SkillExecuteResponse<T>> {
+    const config = this.getConfig();
+    if (!config.appKey || !config.appKey.trim()) {
+      throw new Error("请先在【开发者设置】中录入由平台下发的有效 AppKey 凭据");
+    }
+    // 第二道拦截：凭据已明确校验失败（401/403）时，阻断所有原子能力调用
+    if (this.credentialValid === false) {
+      throw new Error("AppKey 凭据校验未通过（401/403），设备操控已被阻断，请在【开发者设置】中更新有效凭据");
+    }
     return this.fetchWithLog<SkillExecuteResponse<T>>(
       "/gateway/skill/execute",
       {
@@ -394,6 +502,22 @@ class PhoneClient {
     return this.executeSkill(deviceId, "app.force_stop", { package_name: packageName });
   }
 
+  public async getInstalledApps(deviceId: string): Promise<InstalledAppInfo[]> {
+    const res = await this.executeSkill(deviceId, "app.get_installed_apps", {});
+    let data = res.data;
+    if (typeof data === "string") {
+      try {
+        data = JSON.parse(data);
+      } catch {
+        data = {};
+      }
+    }
+    if (data && Array.isArray(data.apps)) {
+      return data.apps;
+    }
+    return [];
+  }
+
   public unlock(deviceId: string, credential: string = "") {
     return this.executeSkill(deviceId, "system.unlock", { credential });
   }
@@ -419,75 +543,12 @@ class PhoneClient {
     return res.data || (res as any);
   }
 
-  // 4. SSE 实时事件流（使用 fetch 实现以携带 X-AppKey 鉴权头）
+  // 4. SSE 实时事件流：统一接入全局单例总线，避免多连接被服务端互踢
   public connectSse(
     onMessage: (event: any) => void,
-    onError?: (err: any) => void,
+    _onError?: (err: any) => void,
   ): () => void {
-    const config = this.getConfig();
-    const cleanUrl = config.gatewayUrl.replace(/\/+$/, "");
-    const url = `${cleanUrl}/gateway/sse`;
-    const controller = new AbortController();
-
-    (async () => {
-      try {
-        const headers: Record<string, string> = {
-          Accept: "text/event-stream",
-        };
-        if (config.appKey) {
-          headers["X-AppKey"] = config.appKey;
-        }
-
-        const res = await fetch(url, {
-          headers,
-          signal: controller.signal,
-        });
-
-        if (!res.ok) {
-          throw new Error(`SSE 连接失败: HTTP ${res.status}`);
-        }
-
-        const reader = res.body?.getReader();
-        if (!reader) throw new Error("无法读取 SSE 数据流");
-
-        const decoder = new TextDecoder();
-        let buffer = "";
-
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-
-          buffer += decoder.decode(value, { stream: true });
-          const blocks = buffer.split("\n\n");
-          buffer = blocks.pop() || "";
-
-          for (const block of blocks) {
-            const dataLines = block
-              .split("\n")
-              .filter((line) => line.startsWith("data:"))
-              .map((line) => line.slice(5).trim());
-
-            for (const dataStr of dataLines) {
-              if (!dataStr) continue;
-              try {
-                const json = JSON.parse(dataStr);
-                onMessage(json);
-              } catch {
-                onMessage(dataStr);
-              }
-            }
-          }
-        }
-      } catch (err: any) {
-        if (err.name !== "AbortError" && onError) {
-          onError(err);
-        }
-      }
-    })();
-
-    return () => {
-      controller.abort();
-    };
+    return this.onSseEvent(onMessage);
   }
 }
 

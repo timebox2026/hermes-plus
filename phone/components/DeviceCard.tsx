@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Smartphone, Pencil, Check, Battery, Wifi } from "lucide-react";
+import { Smartphone, Check } from "lucide-react";
 import type { DeviceInfo } from "../sdk/types";
 
 interface DeviceCardProps {
@@ -118,25 +118,10 @@ export function DeviceCard({
                     color: "var(--text-primary, #111)",
                   }}
                 >
-                  {device.deviceAlias || device.deviceId}
+                  ID: {device.deviceId}
+                  
                 </span>
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setIsEditing(true);
-                  }}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    cursor: "pointer",
-                    color: "var(--text-muted, #888)",
-                    padding: 2,
-                  }}
-                  title="重命名"
-                >
-                  <Pencil size={12} />
-                </button>
+                
               </div>
             )}
             <div
@@ -146,7 +131,7 @@ export function DeviceCard({
                 marginTop: 2,
               }}
             >
-              ID: {device.deviceId}
+              型号: {device.deviceAlias || device.deviceId}
             </div>
           </div>
         </div>

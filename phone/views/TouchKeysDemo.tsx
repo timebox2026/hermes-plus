@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { Hand, ArrowRight, Play, Copy, Check, Smartphone } from "lucide-react";
+import { Play, Copy, Check, Smartphone } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 import type { DeviceInfo } from "../sdk/types";
 import { NoDevicePrompt } from "../components/NoDevicePrompt";
@@ -27,7 +27,7 @@ export function TouchKeysDemo({ onNavigateToDevices }: TouchKeysDemoProps): Reac
   const [keyCode, setKeyCode] = useState(4);
 
   // 输入参数
-  const [inputText, setInputText] = useState("浪花 AI 自动化测试 🚀");
+  const [inputText, setInputText] = useState("这里的风景真美~");
 
   const [executing, setExecuting] = useState(false);
   const [responseJson, setResponseJson] = useState<any>(null);

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from "react";
-import { Smartphone, RefreshCw, QrCode, Plus, AlertCircle } from "lucide-react";
+import { Smartphone, RefreshCw, QrCode, AlertCircle } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 import type { DeviceInfo } from "../sdk/types";
 import { DeviceCard } from "../components/DeviceCard";
@@ -55,6 +55,15 @@ export function DevicesView(): React.JSX.Element {
     setDevices((prev) =>
       prev.map((d) => (d.deviceId === deviceId ? { ...d, deviceAlias: newAlias } : d))
     );
+  };
+
+  const onlineCount = devices.filter((d) => d.status?.toUpperCase() === "ONLINE").length;
+  const offlineCount = devices.filter((d) => d.status?.toUpperCase() !== "ONLINE").length;
+
+  const counts: Record<"ALL" | "ONLINE" | "OFFLINE", number> = {
+    ALL: devices.length,
+    ONLINE: onlineCount,
+    OFFLINE: offlineCount,
   };
 
   const filteredDevices = devices.filter((d) => {
@@ -158,9 +167,26 @@ export function DevicesView(): React.JSX.Element {
                 cursor: "pointer",
                 padding: "4px 2px",
                 position: "relative",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
-              {labels[tab]}
+              <span>{labels[tab]}</span>
+              <span
+                style={{
+                  fontSize: 12,
+                  padding: "1px 6px",
+                  borderRadius: 10,
+                  backgroundColor: active
+                    ? "rgba(37, 99, 235, 0.1)"
+                    : "var(--bg-tertiary, rgba(0,0,0,0.05))",
+                  color: active ? "#2563eb" : "var(--text-muted, #888)",
+                  fontWeight: active ? 600 : 500,
+                }}
+              >
+                {counts[tab]}
+              </span>
               {active && (
                 <div
                   style={{
@@ -200,7 +226,7 @@ export function DevicesView(): React.JSX.Element {
         </div>
       )}
 
-      {/* 设备网格列表 */}
+      {/* 设备网格列表与分状态空状态 */}
       {filteredDevices.length > 0 ? (
         <div
           style={{
@@ -219,7 +245,8 @@ export function DevicesView(): React.JSX.Element {
             />
           ))}
         </div>
-      ) : (
+      ) : devices.length === 0 ? (
+        /* 全局无设备 */
         <div
           style={{
             padding: 60,
@@ -257,6 +284,80 @@ export function DevicesView(): React.JSX.Element {
           >
             <QrCode size={16} />
             <span>扫码绑定真机</span>
+          </button>
+        </div>
+      ) : filter === "OFFLINE" ? (
+        /* 有设备，但当前无离线设备（全部在线） */
+        <div
+          style={{
+            padding: 60,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            color: "var(--text-muted, #888)",
+          }}
+        >
+          <Smartphone size={44} strokeWidth={1.5} style={{ marginBottom: 12, opacity: 0.35 }} />
+          <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 6px 0", color: "var(--text-primary, #111)" }}>
+            暂无离线设备
+          </h3>
+          <p style={{ fontSize: 13, maxWidth: 360, margin: "0 0 16px 0" }}>
+            当前已绑定的手机均处于在线活跃状态。
+          </p>
+          <button
+            type="button"
+            onClick={() => setFilter("ALL")}
+            style={{
+              fontSize: 13,
+              color: "#2563eb",
+              backgroundColor: "rgba(37, 99, 235, 0.08)",
+              border: "none",
+              borderRadius: 6,
+              padding: "6px 14px",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            查看全部设备 ({devices.length})
+          </button>
+        </div>
+      ) : (
+        /* 有设备，但当前无在线设备（全部离线） */
+        <div
+          style={{
+            padding: 60,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            textAlign: "center",
+            color: "var(--text-muted, #888)",
+          }}
+        >
+          <Smartphone size={44} strokeWidth={1.5} style={{ marginBottom: 12, opacity: 0.35 }} />
+          <h3 style={{ fontSize: 16, fontWeight: 600, margin: "0 0 6px 0", color: "var(--text-primary, #111)" }}>
+            暂无在线设备
+          </h3>
+          <p style={{ fontSize: 13, maxWidth: 360, margin: "0 0 16px 0" }}>
+            已绑定的手机当前处于离线状态，请确认设备已开机并连入网络。
+          </p>
+          <button
+            type="button"
+            onClick={() => setFilter("ALL")}
+            style={{
+              fontSize: 13,
+              color: "#2563eb",
+              backgroundColor: "rgba(37, 99, 235, 0.08)",
+              border: "none",
+              borderRadius: 6,
+              padding: "6px 14px",
+              cursor: "pointer",
+              fontWeight: 500,
+            }}
+          >
+            查看全部设备 ({devices.length})
           </button>
         </div>
       )}

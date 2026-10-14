@@ -272,7 +272,8 @@ function Layout({
   // [Phone Extension Mount Start]
   const [activeSuite, setActiveSuite] = useState<"hermes" | "phone">(() => {
     try {
-      return (localStorage.getItem("hermes.activeSuite") as "hermes" | "phone") || "hermes";
+      const saved = localStorage.getItem("hermes.activeSuite");
+      return saved === "phone" ? "phone" : "hermes";
     } catch {
       return "hermes";
     }

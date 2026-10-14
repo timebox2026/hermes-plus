@@ -7,6 +7,7 @@ import { AppControlDemo } from "./AppControlDemo";
 import { SystemPrivDemo } from "./SystemPrivDemo";
 import { ScreenshotDemo } from "./ScreenshotDemo";
 import { EventStreamDemo } from "./EventStreamDemo";
+import { NewWorkView } from "./NewWorkView";
 
 interface PhoneMainViewProps {
   activeNav: PhoneNavId;
@@ -40,8 +41,9 @@ export function PhoneMainView({
     case "event-stream":
       return <EventStreamDemo onNavigateToGateway={goToGateway} />;
     case "new-work":
-      return <DevicesView />;
+      return <NewWorkView />;
     default:
       return <DevicesView />;
   }
 }
+

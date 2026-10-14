@@ -1,5 +1,5 @@
 import type React from "react";
-import { Smartphone, QrCode, ArrowRight, AlertTriangle } from "lucide-react";
+import { Smartphone, QrCode, ArrowRight } from "lucide-react";
 
 interface NoDevicePromptProps {
   onNavigateToDevices?: () => void;

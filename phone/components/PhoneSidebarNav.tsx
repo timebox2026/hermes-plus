@@ -4,12 +4,12 @@ import {
   Plus,
   ChevronDown,
   ChevronRight,
-  Zap,
   Hand,
   AppWindow,
   ShieldAlert,
   Camera,
   Radio,
+  Settings,
 } from "lucide-react";
 
 export type PhoneNavId =
@@ -36,9 +36,10 @@ export function PhoneSidebarNav({
   const [atomicOpen, setAtomicOpen] = useState(true);
 
   return (
-    <>
+    <div style={{ display: "flex", flexDirection: "column", height: "100%", width: "100%" }}>
+      {/* 1. 顶部主要业务：新工作、我的手机 */}
       <nav className="sidebar-nav sidebar-nav-pinned">
-        {/* + 新工作：完全复用系统官方 sidebar-nav-item sidebar-new-chat 样式 */}
+        {/* + 新工作 */}
         <button
           className={`sidebar-nav-item sidebar-new-chat ${
             activeNav === "new-work" ? "active" : ""
@@ -51,7 +52,7 @@ export function PhoneSidebarNav({
           <span className="sidebar-nav-label">新工作</span>
         </button>
 
-        {/* 1. 基础设施：我的手机 */}
+        {/* 我的手机 */}
         <button
           className={`sidebar-nav-item ${activeNav === "my-phones" ? "active" : ""}`}
           onClick={() => onSelect("my-phones")}
@@ -61,21 +62,43 @@ export function PhoneSidebarNav({
           <Smartphone size={16} />
           <span className="sidebar-nav-label">我的手机</span>
         </button>
-
-        {/* 2. 基础设施：平台网关接入 */}
-        <button
-          className={`sidebar-nav-item ${activeNav === "gateway" ? "active" : ""}`}
-          onClick={() => onSelect("gateway")}
-          title="网关接入"
-          aria-label="网关接入"
-        >
-          <Zap size={16} />
-          <span className="sidebar-nav-label">网关接入</span>
-        </button>
       </nav>
 
-      {/* 原子能力演示分组：完全复用系统官方 sidebar-chat-section 与 sidebar-recent-section 样式 */}
-      <div className="sidebar-chat-section" style={{ overflowY: "auto" }}>
+      {/* 2. 底部独立分组：开发者设置 */}
+      <div>
+        <div className="sidebar-section-divider" style={{ margin: "6px 0 8px" }} />
+        
+        {!collapsed && (
+          <div
+            style={{
+              padding: "2px 14px 6px",
+              fontSize: 11,
+              fontWeight: 600,
+              letterSpacing: "0.04em",
+              textTransform: "uppercase",
+              color: "var(--text-muted)",
+              userSelect: "none",
+            }}
+          >
+            系统与开发
+          </div>
+        )}
+
+        <nav className="sidebar-nav sidebar-nav-pinned" style={{ paddingTop: 0 }}>
+          <button
+            className={`sidebar-nav-item ${activeNav === "gateway" ? "active" : ""}`}
+            onClick={() => onSelect("gateway")}
+            title="开发者设置"
+            aria-label="开发者设置"
+          >
+            <Settings size={16} />
+            <span className="sidebar-nav-label">开发者设置</span>
+          </button>
+        </nav>
+      </div>
+
+      {/* 3. 中间原子能力演示分组 (可自适应滚动) */}
+      <div className="sidebar-chat-section" style={{ overflowY: "auto", flex: 1 }}>
         <div className="sidebar-recent-section">
           {!collapsed ? (
             <button
@@ -146,6 +169,8 @@ export function PhoneSidebarNav({
           )}
         </div>
       </div>
-    </>
+
+      
+    </div>
   );
 }

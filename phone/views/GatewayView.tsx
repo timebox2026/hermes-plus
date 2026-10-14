@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import { Zap, Trash2 } from "lucide-react";
+import { Zap, ExternalLink, Globe } from "lucide-react";
 import { phoneClient } from "../sdk/phone-client";
 
 interface LogMessage {
@@ -8,12 +8,22 @@ interface LogMessage {
   type: "info" | "success" | "warn" | "error";
 }
 
+const OPEN_PLATFORM_KEY_URL = "https://bot.beikke.com/open/appkey";
+
 export function GatewayView(): React.JSX.Element {
   const [config, setConfig] = useState(() => phoneClient.getConfig());
   const [isConnected, setIsConnected] = useState<boolean>(false);
   const [busy, setBusy] = useState<boolean>(false);
   const [logs, setLogs] = useState<LogMessage[]>([]);
   const logContainerRef = useRef<HTMLDivElement>(null);
+
+  const openOpenPlatform = () => {
+    if (typeof window !== "undefined" && (window as any).hermesAPI?.openExternal) {
+      void (window as any).hermesAPI.openExternal(OPEN_PLATFORM_KEY_URL);
+    } else {
+      window.open(OPEN_PLATFORM_KEY_URL, "_blank");
+    }
+  };
 
   const addLog = (text: string, type: "info" | "success" | "warn" | "error" = "info") => {
     const time = new Date().toLocaleTimeString();
@@ -41,44 +51,75 @@ export function GatewayView(): React.JSX.Element {
 
   const handleUpdateGateway = async () => {
     setBusy(true);
-    addLog("⚡ 正在探测网关节点通信状态...", "info");
+    addLog("⚡ 正在校验 AppKey 凭据并探测网关通信状态...", "info");
+
+    if (!config.appKey || !config.appKey.trim()) {
+      addLog("❌ 拦截：尚未填写 AppKey，请前往浪花开放平台 (bot.beikke.com) 获取并填写凭证", "error");
+      setBusy(false);
+      setIsConnected(false);
+      return;
+    }
+
+    addLog(`📡 正在连接服务节点: ${config.gatewayUrl}`, "info");
 
     try {
-      // 只探测连通性，绝不重新申请 AppKey（一机一密，严禁随意生成）
-      addLog(`📡 正在连接服务节点: ${config.gatewayUrl}`, "info");
-
-      addLog("📦 正在同步系统组件 [PKG-01] ...", "info");
-      addLog("✅ 组件 [PKG-01] 同步完成", "success");
-      addLog("📥 正在拉取规则集 [PKG-02] ...", "info");
-      addLog("✅ 规则集 [PKG-02] 拉取完成", "success");
-      addLog("⚡ 正在激活通信信道 [CH-01] ...", "info");
-
-      const devices = await phoneClient.listDevices();
-      addLog(`📱 通信信道就绪，当前发现 ${devices.length} 台在线设备`, "success");
-      addLog("🎉 【探测完成】网关连接正常，AppKey 凭证有效！", "success");
-      setIsConnected(true);
+      const result = await phoneClient.validateCredential(config.appKey.trim());
+      if (result.valid) {
+        addLog("✅ [200 OK] 凭证合法有效，开发者身份已认证", "success");
+        addLog("🎉 【校验完成】网关连接正常，AppKey 凭证有效！", "success");
+        setIsConnected(true);
+      } else {
+        addLog(`❌ [鉴权失败] ${result.message}`, "error");
+        const url = config.gatewayUrl.toLowerCase();
+        const isRemoteHttp = url.startsWith("http://") && !url.includes("localhost") && !url.includes("127.0.0.1");
+        if (isRemoteHttp) {
+          addLog("🛡️ 检测到非本机的 HTTP 远端地址，若触发 CSP 拦截：", "warn");
+          addLog("   建议 1：在远程服务器配置 HTTPS 证书，使用 https:// 连接", "info");
+          addLog("   建议 2：使用 SSH 隧道映射到本地：ssh -L 58166:localhost:58166 user@host", "info");
+          addLog("          然后填入 https://api6.beikke.com/aibot/v1 无缝连接！", "success");
+        } else {
+          addLog("💡 提示：请核对 AppKey 是否正确，可前往开放平台 (bot.beikke.com/open/appkey) 查看或重置凭据。", "warn");
+        }
+        setIsConnected(false);
+      }
     } catch (err: any) {
       addLog(`❌ 网关连接失败: ${err?.message || "网络不可达，请检查网关是否已启动"}`, "error");
-      const url = config.gatewayUrl.toLowerCase();
-      const isRemoteHttp = url.startsWith("http://") && !url.includes("localhost") && !url.includes("127.0.0.1");
-      if (isRemoteHttp) {
-        addLog("🛡️ 检测到非本机的 HTTP 远端地址，若触发 CSP 拦截：", "warn");
-        addLog("   建议 1：在远程服务器配置 HTTPS 证书，使用 https:// 连接", "info");
-        addLog("   建议 2：使用 SSH 隧道映射到本地：ssh -L 58166:localhost:58166 user@host", "info");
-        addLog("          然后填入 http://localhost:58166 无缝连接！", "success");
-      } else {
-        addLog("💡 提示：请确认网关服务是否已启动，以及下方填写的 Gateway URL 和 AppKey 是否正确。", "warn");
-      }
       setIsConnected(false);
     } finally {
       setBusy(false);
     }
   };
 
-  const handleSaveConfig = () => {
-    phoneClient.saveConfig(config);
-    addLog(`⚙️ 已更新网关配置地址: ${config.gatewayUrl}`, "info");
-    checkConnection();
+  const handleSaveAndValidate = async () => {
+    let cleanUrl = config.gatewayUrl.trim().replace(/\/+$/, "");
+    if (cleanUrl.startsWith("http://api6.beikke.com") || cleanUrl.startsWith("http://bot.beikke.com")) {
+      cleanUrl = cleanUrl.replace(/^http:\/\//, "https://");
+    }
+    const cleanConfig = { ...config, gatewayUrl: cleanUrl, appKey: config.appKey.trim() };
+    setConfig(cleanConfig);
+    phoneClient.saveConfig(cleanConfig);
+    addLog(`⚙️ 已更新网关配置: ${cleanConfig.gatewayUrl}`, "info");
+
+    if (!cleanConfig.appKey) {
+      addLog("⚠️ AppKey 为空，凭据未配置，请前往浪花开放平台 (bot.beikke.com) 获取并录入。", "warn");
+      setIsConnected(false);
+      return;
+    }
+
+    addLog("🔑 正在校验 AppKey 凭据有效性...", "info");
+    try {
+      const result = await phoneClient.validateCredential(config.appKey.trim());
+      if (result.valid) {
+        addLog("✅ [200 OK] 凭证合法有效，开发者身份已认证", "success");
+        setIsConnected(true);
+      } else {
+        addLog(`❌ [鉴权失败] ${result.message}`, "error");
+        setIsConnected(false);
+      }
+    } catch (err: any) {
+      addLog(`❌ 校验失败: ${err?.message || "无法连接网关"}`, "error");
+      setIsConnected(false);
+    }
   };
 
   return (
@@ -111,7 +152,7 @@ export function GatewayView(): React.JSX.Element {
             }}
           >
             <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, color: "var(--text-primary, #111)" }}>
-              平台网关接入
+              开发者设置
             </h2>
             <div>
               {isConnected ? (
@@ -153,7 +194,7 @@ export function GatewayView(): React.JSX.Element {
           </div>
 
           <p style={{ fontSize: 13, color: "var(--text-muted, #71717a)", margin: "0 0 18px 0", lineHeight: 1.6 }}>
-            一键探测云端与本地服务节点，自动完成设备认证并同步最新的系统组件包与运行环境配置。
+            录入浪花开放平台获取的 AppKey 凭据，点击校验后建立与网关的受信通道，错误或未配置的凭据将阻断所有设备操控能力。
           </p>
 
           {/* 按钮行 */}
@@ -177,7 +218,7 @@ export function GatewayView(): React.JSX.Element {
               }}
             >
               <Zap size={15} />
-              <span>{busy ? "正在更新中..." : "⚡ 更新网关"}</span>
+              <span>{busy ? "正在校验中..." : "⚡ 校验凭据并连接"}</span>
             </button>
 
             {logs.length > 0 && (
@@ -249,6 +290,55 @@ export function GatewayView(): React.JSX.Element {
             padding: 24,
           }}
         >
+          {/* 开放平台自助获取指引横幅 */}
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "space-between",
+              padding: "14px 16px",
+              borderRadius: 10,
+              backgroundColor: "rgba(37, 99, 235, 0.05)",
+              border: "1px solid rgba(37, 99, 235, 0.2)",
+              marginBottom: 20,
+              gap: 16,
+            }}
+          >
+            <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
+              <Globe size={18} color="#2563eb" style={{ marginTop: 2, flexShrink: 0 }} />
+              <div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "#1e40af", marginBottom: 2 }}>
+                  自主获取开发者 AppKey 与网关地址
+                </div>
+                <div style={{ fontSize: 12, color: "#3b82f6", lineHeight: 1.5 }}>
+                  前往浪花 AI 开放平台控制台，在【开发者秘钥】中即可一键复制您的专属凭证和网关地址。
+                </div>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={openOpenPlatform}
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 5,
+                padding: "7px 14px",
+                borderRadius: 8,
+                backgroundColor: "#2563eb",
+                color: "#ffffff",
+                border: "none",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                whiteSpace: "nowrap",
+                flexShrink: 0,
+              }}
+            >
+              <span>前往开放平台</span>
+              <ExternalLink size={13} />
+            </button>
+          </div>
+
           <h3 style={{ fontSize: 15, fontWeight: 600, margin: "0 0 16px 0", color: "var(--text-primary, #111)" }}>
             网关通信参数设置
           </h3>
@@ -256,7 +346,7 @@ export function GatewayView(): React.JSX.Element {
           <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
             <div>
               <label style={{ display: "block", fontSize: 12, fontWeight: 500, color: "var(--text-muted, #71717a)", marginBottom: 6 }}>
-                网关服务端地址 (Gateway Base URL)
+                网关服务端地址
               </label>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
@@ -272,11 +362,11 @@ export function GatewayView(): React.JSX.Element {
                     backgroundColor: "var(--bg-primary, #ffffff)",
                     color: "var(--text-primary, #111)",
                   }}
-                  placeholder="http://localhost:58166"
+                  placeholder="https://api6.beikke.com/aibot/v1"
                 />
                 <button
                   type="button"
-                  onClick={handleSaveConfig}
+                  onClick={handleSaveAndValidate}
                   style={{
                     padding: "8px 16px",
                     borderRadius: 8,
@@ -296,9 +386,25 @@ export function GatewayView(): React.JSX.Element {
                 <label style={{ fontSize: 12, fontWeight: 500, color: "var(--text-muted, #71717a)" }}>
                   开发者 AppKey (X-AppKey 凭证)
                 </label>
-                <span style={{ fontSize: 11, color: "#16a34a", fontWeight: 600, letterSpacing: "0.01em" }}>
-                  🔐 一机一密 · 机器唯一绑定
-                </span>
+                <button
+                  type="button"
+                  onClick={openOpenPlatform}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: 4,
+                    fontSize: 12,
+                    color: "#2563eb",
+                    fontWeight: 600,
+                    background: "none",
+                    border: "none",
+                    padding: 0,
+                    cursor: "pointer",
+                  }}
+                >
+                  <span>前往开放平台获取</span>
+                  <ExternalLink size={13} />
+                </button>
               </div>
               <div style={{ display: "flex", gap: 8 }}>
                 <input
@@ -315,11 +421,11 @@ export function GatewayView(): React.JSX.Element {
                     backgroundColor: "var(--bg-primary, #ffffff)",
                     color: "var(--text-primary, #111)",
                   }}
-                  placeholder="sk-lh-xxxxxxxxxxxxxxxx（由网关首次初始化时颁发）"
+                  placeholder="sk-xxxxxxxxxxxxxxxx（前往开放平台 bot.beikke.com 复制）"
                 />
                 <button
                   type="button"
-                  onClick={handleSaveConfig}
+                  onClick={handleSaveAndValidate}
                   style={{
                     padding: "8px 16px",
                     borderRadius: 8,
@@ -331,12 +437,12 @@ export function GatewayView(): React.JSX.Element {
                     cursor: "pointer",
                   }}
                 >
-                  保存凭证
+                  保存并校验凭据
                 </button>
               </div>
               <div style={{ fontSize: 11, color: "var(--text-muted, #71717a)", marginTop: 6, lineHeight: 1.5 }}>
-                ⚠️ AppKey 由网关服务在初始化时唯一颁发，与当前物理机器绑定。<br />
-                严禁随意重新申请——同一台机器始终使用同一个 Key，即「一机一密」。
+                💡 AppKey 是调用浪花 AI 网关的唯一受信凭据，可登录浪花开放平台自行获取并妥善保管。<br />
+                凭据未配置或错误时，所有设备操控与原子能力调用将被完全阻断。
               </div>
             </div>
           </div>
