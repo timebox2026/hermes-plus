@@ -109,7 +109,7 @@ hermes-plus/
 
 ### 改动 2：放行远程 HTTP 网关 CSP (`src/renderer/index.html` & `src/main/app/start.ts`)
 - **改动目的**：
-  上游默认 CSP 仅放行了本地回环地址（`http://127.0.0.1:*` 与 `http://localhost:*`），对外部连接仅允许 `https:`。为了支持开发者在局域网内或公网测试服务器直连运行中的 Java/Python HTTP 网关（例如 `https://api6.beikke.com/aibot/v1`），需要在安全策略中增加对 `http:` 的支持。
+  上游默认 CSP 仅放行了本地回环地址（`http://127.0.0.1:*` 与 `http://localhost:*`），对外部连接仅允许 `https:`。为了支持开发者在局域网内或公网测试服务器直连运行中的 Java/Python HTTP 网关（例如 `https://your-gateway.example.com`），需要在安全策略中增加对 `http:` 的支持。
 - **改动位置与代码**：
 
 1. **渲染进程开发模板** (`src/renderer/index.html` 第 8 行)：

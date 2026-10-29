@@ -8,7 +8,9 @@ interface LogMessage {
   type: "info" | "success" | "warn" | "error";
 }
 
-const OPEN_PLATFORM_KEY_URL = "https://bot.beikke.com/open/appkey";
+const OPEN_PLATFORM_KEY_URL =
+  (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_OPEN_PLATFORM_URL) ||
+  "https://bot.beikke.com/open/appkey";
 
 export function GatewayView(): React.JSX.Element {
   const [config, setConfig] = useState(() => phoneClient.getConfig());
@@ -76,9 +78,9 @@ export function GatewayView(): React.JSX.Element {
           addLog("🛡️ 检测到非本机的 HTTP 远端地址，若触发 CSP 拦截：", "warn");
           addLog("   建议 1：在远程服务器配置 HTTPS 证书，使用 https:// 连接", "info");
           addLog("   建议 2：使用 SSH 隧道映射到本地：ssh -L 58166:localhost:58166 user@host", "info");
-          addLog("          然后填入 https://api6.beikke.com/aibot/v1 无缝连接！", "success");
+          addLog("          然后填入 http://localhost:58166 即可无缝连接！", "success");
         } else {
-          addLog("💡 提示：请核对 AppKey 是否正确，可前往开放平台 (bot.beikke.com/open/appkey) 查看或重置凭据。", "warn");
+          addLog("💡 提示：请核对 AppKey 是否正确，可前往开放平台查看或重置凭据。", "warn");
         }
         setIsConnected(false);
       }
@@ -92,8 +94,14 @@ export function GatewayView(): React.JSX.Element {
 
   const handleSaveAndValidate = async () => {
     let cleanUrl = config.gatewayUrl.trim().replace(/\/+$/, "");
-    if (cleanUrl.startsWith("http://api6.beikke.com") || cleanUrl.startsWith("http://bot.beikke.com")) {
-      cleanUrl = cleanUrl.replace(/^http:\/\//, "https://");
+    if (cleanUrl) {
+      if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+        cleanUrl = "http://" + cleanUrl;
+      }
+      const isLocal = cleanUrl.includes("localhost") || cleanUrl.includes("127.0.0.1");
+      if (!isLocal && cleanUrl.startsWith("http://")) {
+        cleanUrl = cleanUrl.replace(/^http:\/\//, "https://");
+      }
     }
     const cleanConfig = { ...config, gatewayUrl: cleanUrl, appKey: config.appKey.trim() };
     setConfig(cleanConfig);
@@ -362,7 +370,7 @@ export function GatewayView(): React.JSX.Element {
                     backgroundColor: "var(--bg-primary, #ffffff)",
                     color: "var(--text-primary, #111)",
                   }}
-                  placeholder="https://api6.beikke.com/aibot/v1"
+                  placeholder="http://localhost:58166 或 https://your-gateway.example.com"
                 />
                 <button
                   type="button"
@@ -421,7 +429,7 @@ export function GatewayView(): React.JSX.Element {
                     backgroundColor: "var(--bg-primary, #ffffff)",
                     color: "var(--text-primary, #111)",
                   }}
-                  placeholder="sk-xxxxxxxxxxxxxxxx（前往开放平台 bot.beikke.com 复制）"
+                  placeholder="sk-xxxxxxxxxxxxxxxx（前往开放平台复制凭证）"
                 />
                 <button
                   type="button"

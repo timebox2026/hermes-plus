@@ -93,10 +93,11 @@ npm run dev
 
 1. Open the app and switch to **[ 📱 Phone ]** mode at the top of the sidebar.
 2. Click **Developer Settings** (系统与开发 -> 开发者设置).
-3. The official production gateway is configured by default:
+3. Configure the Gateway URL (default local or self-hosted gateway):
    ```text
-   https://api6.beikke.com/aibot/v1
+   http://localhost:58166
    ```
+   *(Or your deployed gateway instance: `https://your-gateway.example.com`)*
 4. Enter your developer `AppKey` (obtainable for free at [Langhua AI Open Platform](https://bot.beikke.com/open/appkey)).
 5. Click **Save & Verify Credential**. Once validated, the green **● Connected** badge will light up!
 

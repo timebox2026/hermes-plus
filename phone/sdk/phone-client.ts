@@ -241,14 +241,14 @@ class PhoneClient {
   }
 
   public getConfig(): GatewayConfig {
+    const defaultGateway =
+      (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_GATEWAY_URL) ||
+      "http://localhost:58166";
     try {
       let savedUrl = (localStorage.getItem(STORAGE_GATEWAY_URL_KEY) || "").trim();
-      // 自动清洗与升级旧测试地址与协议错误
-      if (!savedUrl || savedUrl.includes("bk.shiguangxiazi.com")) {
-        savedUrl = "https://api6.beikke.com/aibot/v1";
-        localStorage.setItem(STORAGE_GATEWAY_URL_KEY, savedUrl);
-      } else if (savedUrl.startsWith("http://api6.beikke.com")) {
-        savedUrl = savedUrl.replace(/^http:\/\//, "https://").replace(/\/+$/, "");
+      // 如果未配置或存在历史遗留测试域名，默认回退至本地/环境变量网关
+      if (!savedUrl || savedUrl.includes("bk.shiguangxiazi.com") || savedUrl.includes("api6.beikke.com")) {
+        savedUrl = defaultGateway;
         localStorage.setItem(STORAGE_GATEWAY_URL_KEY, savedUrl);
       }
 
@@ -260,7 +260,7 @@ class PhoneClient {
       };
     } catch {
       return {
-        gatewayUrl: "https://api6.beikke.com/aibot/v1",
+        gatewayUrl: defaultGateway,
         appKey: "",
       };
     }
@@ -270,8 +270,16 @@ class PhoneClient {
     try {
       if (config.gatewayUrl !== undefined) {
         let cleanUrl = config.gatewayUrl.trim().replace(/\/+$/, "");
-        if (cleanUrl.startsWith("http://api6.beikke.com") || cleanUrl.startsWith("http://bot.beikke.com")) {
-          cleanUrl = cleanUrl.replace(/^http:\/\//, "https://");
+        if (cleanUrl) {
+          // 协议安全校验与规范化
+          if (!cleanUrl.startsWith("http://") && !cleanUrl.startsWith("https://")) {
+            cleanUrl = "http://" + cleanUrl;
+          }
+          // 安全强化：对非本地回环地址，禁止通过不安全的明文 HTTP 传输凭据，自动升级为 HTTPS
+          const isLocal = cleanUrl.includes("localhost") || cleanUrl.includes("127.0.0.1");
+          if (!isLocal && cleanUrl.startsWith("http://")) {
+            cleanUrl = cleanUrl.replace(/^http:\/\//, "https://");
+          }
         }
         localStorage.setItem(STORAGE_GATEWAY_URL_KEY, cleanUrl);
       }
