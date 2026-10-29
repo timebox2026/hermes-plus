@@ -18,6 +18,9 @@ type DeviceListener = (devices: DeviceInfo[]) => void;
 type BindingResultListener = (result: { status: string; requestId?: string; deviceId?: string }) => void;
 type SseEventListener = (event: any) => void;
 
+const STORAGE_CONFIG_VERSION_KEY = "hermes.phone.config.ver";
+const CURRENT_CONFIG_VERSION = "2";
+
 class PhoneClient {
   private logListeners: Set<LogListener> = new Set();
   private deviceListeners: Set<DeviceListener> = new Set();
@@ -245,9 +248,15 @@ class PhoneClient {
       (typeof import.meta !== "undefined" && (import.meta as any).env?.VITE_GATEWAY_URL) ||
       "http://localhost:58166";
     try {
+      // 检查版本号迁移：旧配置自动重置为默认本地网关
+      const version = localStorage.getItem(STORAGE_CONFIG_VERSION_KEY);
+      if (version !== CURRENT_CONFIG_VERSION) {
+        localStorage.setItem(STORAGE_CONFIG_VERSION_KEY, CURRENT_CONFIG_VERSION);
+        localStorage.removeItem(STORAGE_GATEWAY_URL_KEY);
+      }
+
       let savedUrl = (localStorage.getItem(STORAGE_GATEWAY_URL_KEY) || "").trim();
-      // 如果未配置或存在历史遗留测试域名，默认回退至本地/环境变量网关
-      if (!savedUrl || savedUrl.includes("bk.shiguangxiazi.com") || savedUrl.includes("api6.beikke.com")) {
+      if (!savedUrl) {
         savedUrl = defaultGateway;
         localStorage.setItem(STORAGE_GATEWAY_URL_KEY, savedUrl);
       }
